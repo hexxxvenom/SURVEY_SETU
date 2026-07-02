@@ -1,6 +1,9 @@
 # Use Node.js 18 (Railway standard)
 FROM node:18-alpine
 
+# Install openssl for Prisma (required for alpine)
+RUN apk add --no-available --update openssl
+
 # Create app directory
 WORKDIR /usr/src/app
 
