@@ -1,0 +1,11 @@
+<resources>
+    <!-- Simple fallback theme using Framework Material theme. -->
+    <style name="Theme.SurveySetu" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Customize your theme here. -->
+    </style>
+
+    <style name="Theme.SurveySetu.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>

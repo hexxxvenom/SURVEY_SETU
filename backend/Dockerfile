@@ -1,0 +1,28 @@
+# Use Node.js 18 (Railway standard)
+FROM node:18-alpine
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build TypeScript
+RUN npm run build
+
+# Create uploads directory and set permissions
+RUN mkdir -p uploads && chmod 777 uploads
+
+# Expose port
+EXPOSE 3000
+
+# Start command
+# We run migrations before starting
+CMD npx prisma migrate deploy && npm start

@@ -1,0 +1,198 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+  SURVEYOR
+}
+
+enum Status {
+  ACTIVE
+  LOCKED
+}
+
+enum SurveyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id               String          @id @default(uuid())
+  role             Role            @default(SURVEYOR)
+  name             String
+  username         String          @unique
+  password_hash    String
+  status           Status          @default(ACTIVE)
+  created_by       String?
+  linked_device_id String?
+  
+  // Relations
+  devices          Device[]
+  responses        Response[]
+  loginSessions    LoginSession[]
+  auditLogs        AuditLog[]
+  createdSurveys   Survey[]        @relation("CreatedSurveys")
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Device {
+  id                    String         @id @default(uuid())
+  device_identifier     String         @unique
+  assigned_user_id      String?
+  status                Status         @default(ACTIVE)
+  last_seen_at          DateTime?
+  printer_default_size  String?        // e.g., "58mm", "76mm", "80mm"
+  
+  // Relations
+  user                  User?          @relation(fields: [assigned_user_id], references: [id])
+  responses             Response[]
+  loginSessions         LoginSession[]
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+}
+
+model Survey {
+  id               String         @id @default(uuid())
+  title            String
+  version          Int            @default(1)
+  status           SurveyStatus   @default(DRAFT)
+  language         String         @default("en")
+  created_by       String?
+  
+  // Relations
+  creator          User?          @relation("CreatedSurveys", fields: [created_by], references: [id])
+  questions        Question[]
+  responses        Response[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Question {
+  id               String         @id @default(uuid())
+  survey_id        String
+  question_text    String
+  order_index      Int
+  option_count     Int            // 2, 3, or 4
+  is_mandatory     Boolean        @default(true)
+  
+  // Relations
+  survey           Survey         @relation(fields: [survey_id], references: [id])
+  options          Option[]
+  answers          Answer[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([survey_id])
+}
+
+model Option {
+  id               String         @id @default(uuid())
+  question_id      String
+  option_text      String
+  order_index      Int
+  
+  // Relations
+  question         Question       @relation(fields: [question_id], references: [id])
+  answers          Answer[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([question_id])
+}
+
+model Response {
+  id                   String         @id @default(uuid())
+  survey_id            String
+  survey_version       Int
+  device_id            String
+  surveyor_id          String
+  respondent_photo_url String?
+  gps_lat              Float?
+  gps_lng              Float?
+  submitted_at         DateTime       @default(now())
+  sync_status          String         @default("SYNCED")
+  
+  // Relations
+  survey               Survey         @relation(fields: [survey_id], references: [id])
+  device               Device         @relation(fields: [device_id], references: [id])
+  surveyor             User           @relation(fields: [surveyor_id], references: [id])
+  answers              Answer[]
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([survey_id])
+  @@index([surveyor_id])
+  @@index([device_id])
+  @@index([submitted_at])
+}
+
+model Answer {
+  id                   String         @id @default(uuid())
+  response_id          String
+  question_id          String
+  selected_option_id   String
+  
+  // Relations
+  response             Response       @relation(fields: [response_id], references: [id])
+  question             Question       @relation(fields: [question_id], references: [id])
+  selectedOption       Option         @relation(fields: [selected_option_id], references: [id])
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([response_id])
+  @@index([question_id])
+}
+
+model LoginSession {
+  id                   String         @id @default(uuid())
+  user_id              String
+  device_id            String
+  selfie_photo_url     String?
+  login_timestamp      DateTime       @default(now())
+  logout_timestamp     DateTime?
+  
+  // Relations
+  user                 User           @relation(fields: [user_id], references: [id])
+  device               Device         @relation(fields: [device_id], references: [id])
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([user_id])
+}
+
+model AuditLog {
+  id                   String         @id @default(uuid())
+  actor_user_id        String
+  action_type          String
+  target_entity        String
+  target_id            String
+  timestamp            DateTime       @default(now())
+  details_json         String?
+  
+  // Relations
+  actor                User           @relation(fields: [actor_user_id], references: [id])
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([actor_user_id])
+  @@index([timestamp])
+}

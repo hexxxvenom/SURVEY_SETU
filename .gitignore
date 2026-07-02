@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+
+# Environment
+.env
+
+# Uploads (Keep local uploads out of Git)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Database snapshots
+*.zip
+*.sql
