@@ -15,8 +15,9 @@ RUN npm install
 COPY . .
 
 # Generate Prisma client
-# Skip validation during build to avoid crashing if DATABASE_URL is only available at runtime
-RUN npx prisma generate
+# Use a dummy URL during build to satisfy Prisma's validation
+# The real URL will be injected by Railway at runtime
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # Build TypeScript
 RUN npm run build
