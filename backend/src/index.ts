@@ -13,7 +13,13 @@ import responseRoutes from './routes/responses';
 dotenv.config();
 
 // SECURITY: Crash immediately if critical env vars are missing
+// We add a more descriptive log for debugging Railway deployments
 if (!process.env.JWT_SECRET) {
+  console.log('--- DEBUG: Environment Variables ---');
+  console.log('PORT:', process.env.PORT);
+  console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
+  console.log('JWT_SECRET present:', !!process.env.JWT_SECRET);
+  console.log('------------------------------------');
   console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start.');
   process.exit(1);
 }
