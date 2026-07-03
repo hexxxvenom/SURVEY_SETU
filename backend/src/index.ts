@@ -10,12 +10,15 @@ import adminRoutes from './routes/admin';
 import surveyRoutes from './routes/surveys';
 import responseRoutes from './routes/responses';
 
-dotenv.config();
+// SECURITY: Load local .env only if not in production
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 // SECURITY: Crash immediately if critical env vars are missing
-// We add a more descriptive log for debugging Railway deployments
 if (!process.env.JWT_SECRET) {
   console.log('--- DEBUG: Environment Variables ---');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('PORT:', process.env.PORT);
   console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
   console.log('JWT_SECRET present:', !!process.env.JWT_SECRET);

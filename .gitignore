@@ -18,5 +18,6 @@ backend/uploads/*
 Thumbs.db
 
 # Database snapshots
-*.zip
+# We WANT to include pgsql.zip now as requested
+!pgsql.zip
 *.sql

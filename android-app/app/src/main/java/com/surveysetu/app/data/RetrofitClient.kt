@@ -6,9 +6,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    // Use your machine's IP address so your physical phone can connect via Wi-Fi
-    // Backend port is 3000
-    private const val BASE_URL = "http://10.47.163.149:3000"
+    // Cloud Backend URL - Accessible from any network
+    private const val BASE_URL = "https://surveysetu-production.up.railway.app/"
 
     var authToken: String? = null
 
