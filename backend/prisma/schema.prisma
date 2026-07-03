@@ -1,8 +1,7 @@
 datasource db {
   provider = "postgresql"
-  // Dummy placeholder to bypass build-time validation.
-  // The real URL is injected at runtime in src/prisma.ts
-  url      = "postgresql://dummy:dummy@localhost:5432/dummy"
+  // Using env() so it picks up the real URL at runtime
+  url      = env("DATABASE_URL")
 }
 
 // Skip Prisma's built-in validation during build
