@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "prisma": {
-    "seed": "node dist/prisma/seed.js"
+    "seed": "node dist/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
