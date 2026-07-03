@@ -15,6 +15,7 @@ RUN npm install
 COPY . .
 
 # Generate Prisma client
+# Skip validation during build to avoid crashing if DATABASE_URL is only available at runtime
 RUN npx prisma generate
 
 # Build TypeScript
