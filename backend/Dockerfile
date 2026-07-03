@@ -1,35 +1,27 @@
-# Use Node.js 18 (Railway standard)
 FROM node:18-alpine
 
-# Install openssl for Prisma (required for alpine)
+# Install openssl for Prisma
 RUN apk add --no-cache openssl
 
-# Create app directory
 WORKDIR /usr/src/app
 
-# Install dependencies
 COPY package*.json ./
+# Install ALL dependencies including devDeps for build
 RUN npm install
 
-# Copy source code
 COPY . .
 
-# Set a default DATABASE_URL for build-time validation ONLY.
-# This allows 'prisma generate' to pass.
-ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
-
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client with a DUMMY env to satisfy build-time validation
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # Build TypeScript
 RUN npm run build
 
-# Create uploads directory and set permissions
+# Create uploads directory
 RUN mkdir -p uploads && chmod 777 uploads
 
-# Expose port
 EXPOSE 3000
 
-# Start command: This runs ONLY at runtime.
-# This is when Railway provides the REAL DATABASE_URL.
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# RUNTIME ONLY: Run migrations and start
+# This ensures DATABASE_URL is only accessed when Railway provides it at runtime
+ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
