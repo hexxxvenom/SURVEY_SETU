@@ -3,6 +3,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Skip Prisma's built-in validation during build
 generator client {
   provider = "prisma-client-js"
 }
