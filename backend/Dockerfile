@@ -1,29 +1,32 @@
 FROM node:18-alpine
 
-# Install openssl for Prisma
-RUN apk add --no-cache openssl
+# Install system dependencies
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /usr/src/app
 
+# Copy dependency files
 COPY package*.json ./
-# Install ALL dependencies including devDeps for build
+
+# Install dependencies (including TypeScript/ts-node for seeding)
 RUN npm install
 
+# Copy source code
 COPY . .
 
-# Generate Prisma client with a DUMMY env to satisfy build-time validation
-RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
+# Set dummy ENV for Prisma generation
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
 
-# Build TypeScript
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build the application
 RUN npm run build
-# Explicitly compile the seed file to ensure it exists in dist/
-RUN npx tsc src/seed.ts --outDir dist --esModuleInterop --skipLibCheck --target es2022
 
-# Create uploads directory
+# Set production permissions
 RUN mkdir -p uploads && chmod 777 uploads
 
 EXPOSE 3000
 
-# RUNTIME ONLY: Run migrations and start
-# This ensures DATABASE_URL is only accessed when Railway provides it at runtime
-ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# RUNTIME: Run migrations and start the server
+ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && npm start"]
