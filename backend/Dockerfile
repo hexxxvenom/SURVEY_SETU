@@ -16,6 +16,8 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma gene
 
 # Build TypeScript
 RUN npm run build
+# Explicitly compile the seed file to ensure it exists in dist/
+RUN npx tsc src/seed.ts --outDir dist --esModuleInterop --skipLibCheck --target es2022
 
 # Create uploads directory
 RUN mkdir -p uploads && chmod 777 uploads
