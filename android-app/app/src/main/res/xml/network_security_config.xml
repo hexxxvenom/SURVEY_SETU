@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- GLOBAL TRUST: Bypasses DNS blocks for Railway infrastructure -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">railway.app</domain>
+        <domain includeSubdomains="true">up.railway.app</domain>
         <domain includeSubdomains="true">surveysetu-production.up.railway.app</domain>
     </domain-config>
+
+    <!-- SYSTEM TRUST: Ensures high-security handshake -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

@@ -8,10 +8,9 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
 
-// ABSOLUTE MASTER OVERRIDE:
-// This guarantees you can ALWAYS login as the owner, even if the DB has a glitch.
+// RECOVERY CONFIG (Only used if user is missing from DB)
 const MASTER_USER = "superadmin";
-const MASTER_PASS = "admin123";
+const DEFAULT_PASS = "admin123";
 
 router.post('/login', async (req, res) => {
   const { username, password, device_identifier } = req.body;
@@ -19,42 +18,41 @@ router.post('/login', async (req, res) => {
 
   console.log(`[AUTH] Attempt: ${username}`);
 
-  // 1. MASTER FAIL-SAFE (Check this BEFORE anything else)
-  // If you are the owner, we bypass the DB check to ensure you are never locked out.
-  if (username === MASTER_USER && password === MASTER_PASS) {
-    console.log(`[AUTH] Master Login Triggered for ${username}`);
+  // 1. Fetch User from Database
+  let user = await prisma.user.findUnique({ where: { username } });
 
-    // Ensure the superadmin exists in DB for other relations, but login is guaranteed
-    let user = await prisma.user.findUnique({ where: { username: MASTER_USER } });
-    if (!user) {
-        user = await prisma.user.create({
-            data: {
-                id: 'master-admin-id',
-                username: MASTER_USER,
-                password_hash: await bcrypt.hash(MASTER_PASS, 10),
-                name: 'System Administrator',
-                role: 'SUPER_ADMIN',
-                status: 'ACTIVE'
-            }
-        });
-    }
-
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_KEY, { expiresIn: '24h' });
-    return res.json({ token, role: user.role, name: user.name, username: user.username });
+  // 2. EMERGENCY AUTO-REPAIR:
+  // If master user is deleted from DB, recreate it with default pass.
+  // This ONLY runs if the database is literally empty for this user.
+  if (!user && username === MASTER_USER) {
+    console.log(`[AUTH] Emergency Re-seeding Master Admin...`);
+    user = await prisma.user.create({
+        data: {
+            id: 'master-admin-id',
+            username: MASTER_USER,
+            password_hash: await bcrypt.hash(DEFAULT_PASS, 10),
+            name: 'System Administrator',
+            role: 'SUPER_ADMIN',
+            status: 'ACTIVE'
+        }
+    });
   }
 
-  // 2. STANDARD LOGIN (For surveyors and other staff)
-  const user = await prisma.user.findUnique({ where: { username } });
-
+  // 3. VALIDATE USER
   if (!user || user.status === 'LOCKED') {
     return res.status(401).json({ error: 'Invalid credentials or account locked' });
   }
 
+  // 4. SECURE PASSWORD CHECK
+  // We NOW strictly check against the database hash.
+  // Old "admin123" bypass is removed to support password changes.
   const isValid = await bcrypt.compare(password, user.password_hash);
+
   if (!isValid) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
+  // 5. Device Binding for Surveyors
   if (user.role === 'SURVEYOR') {
     const device = await prisma.device.findUnique({ where: { device_identifier } });
     if (!device || device.status === 'LOCKED' || device.assigned_user_id !== user.id) {
@@ -80,6 +78,10 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
 
 router.post('/change-password', authenticate, async (req: AuthRequest, res) => {
   const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
     where: { id: req.user!.id },
