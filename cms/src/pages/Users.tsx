@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { UserPlus, Lock, Unlock, Edit, Loader2 } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Edit, Loader2, X } from 'lucide-react';
 
 export const Users = () => {
   const { token, role } = useAuthStore();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
+
+  // New User Form State
+  const [formData, setFormData] = useState({ name: '', username: '', password: '', role: 'SURVEYOR' });
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -26,6 +30,21 @@ export const Users = () => {
   useEffect(() => {
     fetchUsers();
   }, [token, API_URL]);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      // Note: We need a POST /admin/users endpoint in backend
+      await axios.post(`${API_URL}/admin/users`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShowModal(false);
+      setFormData({ name: '', username: '', password: '', role: 'SURVEYOR' });
+      fetchUsers();
+    } catch (err) {
+      alert("Failed to create user. Ensure API supports this action.");
+    }
+  };
 
   const toggleLock = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
@@ -46,8 +65,11 @@ export const Users = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-navy">User Management</h1>
-        <button className="bg-saffron text-white px-4 py-2 rounded flex items-center gap-2 font-bold hover:bg-orange-500 transition-colors">
-          <UserPlus size={20} /> Create New User
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-saffron text-white px-4 py-2 rounded flex items-center gap-2 font-bold hover:bg-orange-500 transition-colors"
+        >
+          <UserPlus size={20} /> Register New User
         </button>
       </div>
 
@@ -91,7 +113,49 @@ export const Users = () => {
             ))}
           </tbody>
         </table>
+        {users.length === 0 && <div className="p-10 text-center text-gray-400 italic">No users found in database.</div>}
       </div>
+
+      {/* Register Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-navy p-4 text-white flex justify-between items-center">
+              <h2 className="font-bold">Register New System User</h2>
+              <button onClick={() => setShowModal(false)}><X size={20}/></button>
+            </div>
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
+                <input required className="w-full border rounded p-2 outline-none focus:border-saffron"
+                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Username</label>
+                <input required className="w-full border rounded p-2 outline-none focus:border-saffron"
+                  value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Initial Password</label>
+                <input required type="password" className="w-full border rounded p-2 outline-none focus:border-saffron"
+                  value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Access Role</label>
+                <select className="w-full border rounded p-2 outline-none"
+                  value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                  <option value="SURVEYOR">Surveyor (App User)</option>
+                  <option value="EDITOR">Editor (Survey Builder)</option>
+                  <option value="ADMIN">Administrator</option>
+                </select>
+              </div>
+              <button className="w-full bg-saffron text-white py-3 rounded font-bold hover:bg-orange-500 mt-4 transition-colors">
+                Create User Account
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

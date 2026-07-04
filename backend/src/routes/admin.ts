@@ -16,6 +16,23 @@ router.get('/users', async (req: AuthRequest, res) => {
   res.json({ data: users });
 });
 
+router.post('/users', async (req: AuthRequest, res) => {
+  const { name, username, password, role } = req.body;
+
+  const existing = await prisma.user.findUnique({ where: { username } });
+  if (existing) return res.status(409).json({ error: 'Username already taken' });
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      username,
+      password_hash: await require('bcryptjs').hash(password, 10),
+      role
+    }
+  });
+  res.status(201).json(user);
+});
+
 router.patch('/users/:id/status', async (req: AuthRequest, res) => {
   const { status } = req.body; // 'ACTIVE' or 'LOCKED'
   const user = await prisma.user.update({
@@ -43,6 +60,17 @@ router.get('/devices', async (req: AuthRequest, res) => {
     orderBy: { createdAt: 'desc' }
   });
   res.json({ data: devices });
+});
+
+router.post('/devices', async (req: AuthRequest, res) => {
+  const { device_identifier } = req.body;
+  const existing = await prisma.device.findUnique({ where: { device_identifier } });
+  if (existing) return res.status(409).json({ error: 'Device already registered' });
+
+  const device = await prisma.device.create({
+    data: { device_identifier }
+  });
+  res.status(201).json(device);
 });
 
 router.patch('/devices/:id/status', async (req: AuthRequest, res) => {

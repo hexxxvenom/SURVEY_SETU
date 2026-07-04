@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { Smartphone, Lock, Unlock, Loader2 } from 'lucide-react';
+import { Smartphone, Lock, Unlock, Loader2, X } from 'lucide-react';
 
 export const Devices = () => {
   const { token } = useAuthStore();
   const [devices, setDevices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
+
+  // New Device Form State
+  const [formData, setFormData] = useState({ device_identifier: '' });
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -26,6 +30,20 @@ export const Devices = () => {
   useEffect(() => {
     fetchDevices();
   }, [token, API_URL]);
+
+  const handleRegisterDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/admin/devices`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShowModal(false);
+      setFormData({ device_identifier: '' });
+      fetchDevices();
+    } catch (err) {
+      alert("Failed to register device.");
+    }
+  };
 
   const toggleLock = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
@@ -46,7 +64,10 @@ export const Devices = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-navy">Device Management</h1>
-        <button className="bg-ashoka text-white px-4 py-2 rounded flex items-center gap-2 font-bold">
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-ashoka text-white px-4 py-2 rounded flex items-center gap-2 font-bold hover:bg-blue-800 transition-colors"
+        >
           <Smartphone size={20} /> Register New Device
         </button>
       </div>
@@ -86,6 +107,32 @@ export const Devices = () => {
         </table>
         {devices.length === 0 && <div className="p-10 text-center text-gray-400 italic">No registered devices.</div>}
       </div>
+
+      {/* Register Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-navy p-4 text-white flex justify-between items-center">
+              <h2 className="font-bold">Hardware Registration</h2>
+              <button onClick={() => setShowModal(false)}><X size={20}/></button>
+            </div>
+            <form onSubmit={handleRegisterDevice} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Device ID / Serial / IMEI</label>
+                <input required className="w-full border rounded p-2 outline-none focus:border-saffron font-mono"
+                  placeholder="e.g., DEV-DEMO-001"
+                  value={formData.device_identifier} onChange={e => setFormData({...formData, device_identifier: e.target.value})}/>
+              </div>
+              <p className="text-[10px] text-gray-400 italic mt-2">
+                Note: Once registered, you must assign a surveyor to this device in the Users section.
+              </p>
+              <button className="w-full bg-ashoka text-white py-3 rounded font-bold hover:bg-blue-800 mt-4 transition-colors">
+                Authorize Hardware
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
