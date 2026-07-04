@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
+// Only Super Admin and Admin can access
 router.use(authenticate, authorize(['SUPER_ADMIN', 'ADMIN']));
 
 // --- User Management ---
@@ -21,8 +22,13 @@ router.get('/users', async (req: AuthRequest, res) => {
   }
 });
 
+// Explicitly handle User Creation
 router.post('/users', async (req: AuthRequest, res) => {
   const { name, username, password, role } = req.body;
+  if (!name || !username || !password || !role) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
   try {
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) return res.status(409).json({ error: 'Username already taken' });
@@ -37,6 +43,7 @@ router.post('/users', async (req: AuthRequest, res) => {
     });
     res.status(201).json(user);
   } catch (error: any) {
+    console.error("User creation failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -48,24 +55,8 @@ router.patch('/users/:id/status', async (req: AuthRequest, res) => {
       where: { id: req.params.id },
       data: { status }
     });
-
-    // Handle audit logging safely - don't crash if AuditLog table has issues
-    try {
-      await prisma.auditLog.create({
-        data: {
-          actor_user_id: req.user!.id,
-          action_type: `USER_${status}`,
-          target_entity: 'User',
-          target_id: user.id
-        }
-      });
-    } catch (auditErr) {
-      console.error("Audit logging failed:", auditErr);
-    }
-
     res.json(user);
   } catch (error: any) {
-    console.error("User status update failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -84,8 +75,13 @@ router.get('/devices', async (req: AuthRequest, res) => {
   }
 });
 
+// Explicitly handle Device Registration
 router.post('/devices', async (req: AuthRequest, res) => {
   const { device_identifier } = req.body;
+  if (!device_identifier) {
+    return res.status(400).json({ error: 'Device Identifier is required' });
+  }
+
   try {
     const existing = await prisma.device.findUnique({ where: { device_identifier } });
     if (existing) return res.status(409).json({ error: 'Device already registered' });
@@ -95,6 +91,7 @@ router.post('/devices', async (req: AuthRequest, res) => {
     });
     res.status(201).json(device);
   } catch (error: any) {
+    console.error("Device registration failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -106,24 +103,8 @@ router.patch('/devices/:id/status', async (req: AuthRequest, res) => {
       where: { id: req.params.id },
       data: { status }
     });
-
-    // Handle audit logging safely
-    try {
-      await prisma.auditLog.create({
-        data: {
-          actor_user_id: req.user!.id,
-          action_type: `DEVICE_${status}`,
-          target_entity: 'Device',
-          target_id: device.id
-        }
-      });
-    } catch (auditErr) {
-      console.error("Audit logging failed:", auditErr);
-    }
-
     res.json(device);
   } catch (error: any) {
-    console.error("Device status update failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
