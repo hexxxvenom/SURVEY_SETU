@@ -36,9 +36,10 @@ app.use(helmet());
 // Performance: Gzip compress all responses (~70% payload reduction for JSON)
 app.use(compression());
 
-// Security: Allow ALL origins temporarily to fix Vercel/Railway connectivity
+// Security: Allow origins based on environment variable
+const allowedOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true;
 app.use(cors({
-  origin: true,
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true,
 }));
