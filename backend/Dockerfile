@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 # Copy dependency files
 COPY package*.json ./
 
-# Install dependencies (including TypeScript/ts-node for seeding)
+# Install ALL dependencies
 RUN npm install
 
 # Copy source code
@@ -26,7 +26,10 @@ RUN npm run build
 # Set production permissions
 RUN mkdir -p uploads && chmod 777 uploads
 
-EXPOSE 3000
+# RAILWAY NETWORK ALIGNMENT:
+# We explicitly set port 8080 to match your Railway environment settings
+ENV PORT=8080
+EXPOSE 8080
 
-# RUNTIME: Run migrations and start the server
-ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# RUNTIME: Run migrations and start the server on port 8080
+ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
