@@ -49,17 +49,23 @@ router.patch('/users/:id/status', async (req: AuthRequest, res) => {
       data: { status }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        actor_user_id: req.user!.id,
-        action_type: `USER_${status}`,
-        target_entity: 'User',
-        target_id: user.id
-      }
-    });
+    // Handle audit logging safely - don't crash if AuditLog table has issues
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actor_user_id: req.user!.id,
+          action_type: `USER_${status}`,
+          target_entity: 'User',
+          target_id: user.id
+        }
+      });
+    } catch (auditErr) {
+      console.error("Audit logging failed:", auditErr);
+    }
 
     res.json(user);
   } catch (error: any) {
+    console.error("User status update failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -101,14 +107,19 @@ router.patch('/devices/:id/status', async (req: AuthRequest, res) => {
       data: { status }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        actor_user_id: req.user!.id,
-        action_type: `DEVICE_${status}`,
-        target_entity: 'Device',
-        target_id: device.id
-      }
-    });
+    // Handle audit logging safely
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actor_user_id: req.user!.id,
+          action_type: `DEVICE_${status}`,
+          target_entity: 'Device',
+          target_id: device.id
+        }
+      });
+    } catch (auditErr) {
+      console.error("Audit logging failed:", auditErr);
+    }
 
     res.json(device);
   } catch (error: any) {
