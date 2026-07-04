@@ -21,7 +21,7 @@ export const Login = () => {
       const res = await axios.post(`${API_URL}/auth/login`, {
         username, password, device_identifier: 'web-cms'
       });
-      setAuth(res.data.token, res.data.role);
+      setAuth(res.data.token, res.data.role, res.data.name);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please check your credentials.');

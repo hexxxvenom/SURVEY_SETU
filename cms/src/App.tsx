@@ -7,6 +7,7 @@ import { SurveyEditor } from './pages/SurveyEditor';
 import { Users } from './pages/Users';
 import { Devices } from './pages/Devices';
 import { Responses } from './pages/Responses';
+import { Settings } from './pages/Settings';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="surveys/:id/edit" element={<SurveyEditor />} />
           <Route path="users" element={<Users />} />
           <Route path="devices" element={<Devices />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

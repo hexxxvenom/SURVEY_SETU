@@ -1,24 +1,46 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useAuthStore } from '../store';
-import { UserPlus, Lock, Unlock, Edit } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Edit, Loader2 } from 'lucide-react';
 
 export const Users = () => {
-  const role = useAuthStore(state => state.role);
+  const { token, role } = useAuthStore();
   const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const API_URL = import.meta.env.VITE_API_URL;
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUsers(res.data.data);
+    } catch (err) {
+      console.error("Failed to fetch users");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Mock user data
-    setUsers([
-      { id: '1', name: 'Admin One', username: 'admin1', role: 'ADMIN', status: 'ACTIVE' },
-      { id: '2', name: 'Editor Alpha', username: 'editor_a', role: 'EDITOR', status: 'ACTIVE' },
-      { id: '3', name: 'Surveyor Field A', username: 'surv_a', role: 'SURVEYOR', status: 'ACTIVE', linked_device_id: 'DEV-12345' },
-      { id: '4', name: 'Surveyor Field B', username: 'surv_b', role: 'SURVEYOR', status: 'LOCKED', linked_device_id: 'DEV-67890' }
-    ]);
-  }, []);
+    fetchUsers();
+  }, [token, API_URL]);
 
-  const toggleLock = (id: string, currentStatus: string) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE' } : u));
+  const toggleLock = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+    try {
+      await axios.patch(`${API_URL}/admin/users/${id}/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchUsers();
+    } catch (err) {
+      alert("Failed to update status");
+    }
   };
+
+  if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-navy" size={48}/></div>;
 
   return (
     <div>
@@ -36,7 +58,6 @@ export const Users = () => {
               <th className="p-4 font-medium">Name</th>
               <th className="p-4 font-medium">Username</th>
               <th className="p-4 font-medium">Role</th>
-              <th className="p-4 font-medium">Device Bound</th>
               <th className="p-4 font-medium">Status</th>
               <th className="p-4 font-medium text-right">Actions</th>
             </tr>
@@ -47,13 +68,6 @@ export const Users = () => {
                 <td className="p-4 font-medium text-gray-800">{user.name}</td>
                 <td className="p-4 text-gray-600">{user.username}</td>
                 <td className="p-4 text-gray-600">{user.role}</td>
-                <td className="p-4 text-gray-600">
-                  {user.linked_device_id ? (
-                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-mono">{user.linked_device_id}</span>
-                  ) : (
-                    <span className="text-gray-400 italic">None</span>
-                  )}
-                </td>
                 <td className="p-4">
                   <span className={`px-2 py-1 text-xs font-bold rounded-full ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {user.status}
@@ -63,7 +77,7 @@ export const Users = () => {
                   <button className="text-ashoka hover:text-navy transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
-                  {(role === 'SUPER_ADMIN' || (role === 'ADMIN' && user.role !== 'SUPER_ADMIN')) && (
+                  {(role === 'SUPER_ADMIN' || (role === 'ADMIN' && user.role !== 'SUPER_ADMIN')) && user.username !== 'superadmin' && (
                     <button 
                       onClick={() => toggleLock(user.id, user.status)}
                       className={`${user.status === 'ACTIVE' ? 'text-orange-500 hover:text-orange-700' : 'text-green-500 hover:text-green-700'} transition-colors`}

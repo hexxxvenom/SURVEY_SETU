@@ -17,7 +17,15 @@ object RetrofitClient {
             authToken?.let {
                 requestBuilder.addHeader("Authorization", "Bearer $it")
             }
-            chain.proceed(requestBuilder.build())
+            val response = chain.proceed(requestBuilder.build())
+            
+            // SECURITY: Handle user/device locking
+            if (response.code == 401 || response.code == 403) {
+                // Clear local session data to force logout
+                authToken = null
+                // In a production app, we would use an event bus or livedata to notify the UI to navigate to login
+            }
+            response
         }
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)

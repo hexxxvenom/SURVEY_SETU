@@ -4,6 +4,7 @@
   "scripts": {
     "start": "cd backend && npm start",
     "build": "cd backend && npm run build",
-    "install": "cd backend && npm install"
+    "install": "cd backend && npm install",
+    "seed": "cd backend && npx prisma db seed"
   }
 }

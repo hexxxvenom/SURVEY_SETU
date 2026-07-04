@@ -1,6 +1,7 @@
 package com.surveysetu.app.ui
 
 import android.net.Uri
+import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -20,7 +21,6 @@ import androidx.core.content.ContextCompat
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.Executor
 
 @Composable
 fun SelfieScreen(
@@ -31,6 +31,7 @@ fun SelfieScreen(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -47,6 +48,10 @@ fun SelfieScreen(
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
+        errorMessage?.let {
+            Text(text = it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+        }
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -57,18 +62,18 @@ fun SelfieScreen(
                     val previewView = PreviewView(ctx)
                     val executor = ContextCompat.getMainExecutor(ctx)
                     cameraProviderFuture.addListener({
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-
-                        imageCapture = ImageCapture.Builder()
-                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                            .build()
-
-                        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
                         try {
+                            val cameraProvider = cameraProviderFuture.get()
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+
+                            imageCapture = ImageCapture.Builder()
+                                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                .build()
+
+                            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+
                             cameraProvider.unbindAll()
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
@@ -77,7 +82,8 @@ fun SelfieScreen(
                                 imageCapture
                             )
                         } catch (ex: Exception) {
-                            ex.printStackTrace()
+                            Log.e("SelfieScreen", "Camera binding failed", ex)
+                            errorMessage = "Camera Error: ${ex.message}"
                         }
                     }, executor)
                     previewView
@@ -88,10 +94,15 @@ fun SelfieScreen(
 
         Button(
             onClick = {
-                val capture = imageCapture ?: return@Button
+                val capture = imageCapture
+                if (capture == null) {
+                    errorMessage = "Camera not ready yet"
+                    return@Button
+                }
+
                 val photoFile = File(
                     context.cacheDir,
-                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + ".jpg"
+                    "selfie_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
                 )
                 
                 val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
@@ -103,7 +114,8 @@ fun SelfieScreen(
                             onSelfieCaptured(Uri.fromFile(photoFile))
                         }
                         override fun onError(exc: ImageCaptureException) {
-                            exc.printStackTrace()
+                            Log.e("SelfieScreen", "Photo capture failed", exc)
+                            errorMessage = "Capture Failed: ${exc.message}"
                         }
                     }
                 )

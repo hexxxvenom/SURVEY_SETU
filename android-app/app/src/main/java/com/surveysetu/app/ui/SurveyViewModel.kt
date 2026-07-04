@@ -26,10 +26,10 @@ class SurveyViewModel(
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     init {
-        loadLocalSurvey()
+        loadLocalSurvey(triggerSyncIfEmpty = true)
     }
 
-    fun loadLocalSurvey() {
+    fun loadLocalSurvey(triggerSyncIfEmpty: Boolean = false) {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
             val survey = surveyDao.getActiveSurvey()
@@ -45,8 +45,22 @@ class SurveyViewModel(
                     )
                 }
                 _surveyState.value = SurveyState.Success(survey, uiQuestions)
+            } else if (triggerSyncIfEmpty) {
+                syncSurveys()
             } else {
                 _surveyState.value = SurveyState.Error("No active survey cached. Please sync.")
+            }
+        }
+    }
+
+    fun syncSurveys() {
+        _surveyState.value = SurveyState.Loading
+        viewModelScope.launch {
+            val result = repository.syncActiveSurveys()
+            if (result.isSuccess) {
+                loadLocalSurvey(triggerSyncIfEmpty = false)
+            } else {
+                _surveyState.value = SurveyState.Error("Sync failed: ${result.exceptionOrNull()?.message}")
             }
         }
     }

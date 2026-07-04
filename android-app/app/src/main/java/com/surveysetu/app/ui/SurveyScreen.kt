@@ -8,10 +8,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.surveysetu.app.data.SurveyEntity
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SurveyScreen(
-    viewModel: SurveyViewModel = viewModel(),
-    onFinish: () -> Unit
+    viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
+    onFinish: (Map<String, String>) -> Unit
 ) {
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
@@ -28,8 +29,8 @@ fun SurveyScreen(
                 Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                     Text(state.message, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.loadLocalSurvey() }) {
-                        Text("Retry")
+                    Button(onClick = { viewModel.syncSurveys() }) {
+                        Text("Sync Now")
                     }
                 }
             }
@@ -39,8 +40,7 @@ fun SurveyScreen(
                     questions = state.questions,
                     isSubmitting = isSubmitting,
                     onSubmit = { answers ->
-                        // photoPath and GPS are currently mocked/placeholders for this view layer
-                        viewModel.submitSurvey(state.survey, answers, null, null, onFinish)
+                        onFinish(answers)
                     }
                 )
             }
@@ -48,55 +48,70 @@ fun SurveyScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SurveyContent(
     survey: SurveyEntity,
     questions: List<QuestionUiModel>,
     isSubmitting: Boolean,
-    onSubmit: (List<AnswerUiModel>) -> Unit
+    onSubmit: (Map<String, String>) -> Unit
 ) {
     var currentIndex by remember { mutableStateOf(0) }
     val answers = remember { mutableStateMapOf<String, String>() }
 
     val currentQuestion = questions[currentIndex]
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.TopCenter
-    ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(survey.title) },
+                actions = {
+                    Text(
+                        text = "Q ${currentIndex + 1}/${questions.size}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                }
+            )
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
-                .widthIn(max = 600.dp)
-                .fillMaxHeight()
-                .padding(16.dp)
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp)
         ) {
-            Text(
-                text = "Question ${currentIndex + 1} of ${questions.size}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+            LinearProgressIndicator(
+                progress = { (currentIndex + 1).toFloat() / questions.size },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = currentQuestion.text,
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineMedium
             )
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             currentQuestion.options.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = answers[currentQuestion.id] == option.id,
-                        onClick = { answers[currentQuestion.id] = option.id }
+                val selected = answers[currentQuestion.id] == option.id
+                Card(
+                    onClick = { answers[currentQuestion.id] = option.id },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                     )
-                    Text(text = option.text, modifier = Modifier.padding(start = 8.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selected,
+                            onClick = { answers[currentQuestion.id] = option.id }
+                        )
+                        Text(text = option.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+                    }
                 }
             }
             
@@ -108,7 +123,8 @@ private fun SurveyContent(
             ) {
                 Button(
                     onClick = { if (currentIndex > 0) currentIndex-- },
-                    enabled = currentIndex > 0 && !isSubmitting
+                    enabled = currentIndex > 0,
+                    modifier = Modifier.width(120.dp).height(48.dp)
                 ) {
                     Text("Previous")
                 }
@@ -118,17 +134,13 @@ private fun SurveyContent(
                         if (currentIndex < questions.size - 1) {
                             currentIndex++
                         } else {
-                            val answerList = answers.map { AnswerUiModel(it.key, it.value) }
-                            onSubmit(answerList)
+                            onSubmit(answers.toMap())
                         }
                     },
-                    enabled = (answers.containsKey(currentQuestion.id) || !currentQuestion.isMandatory) && !isSubmitting
+                    enabled = (answers.containsKey(currentQuestion.id) || !currentQuestion.isMandatory),
+                    modifier = Modifier.width(120.dp).height(48.dp)
                 ) {
-                    if (isSubmitting && currentIndex == questions.size - 1) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    } else {
-                        Text(if (currentIndex == questions.size - 1) "Submit" else "Next")
-                    }
+                    Text(if (currentIndex == questions.size - 1) "Finish" else "Next")
                 }
             }
         }
