@@ -26,6 +26,11 @@ export const Layout = () => {
           <Link to="/" className={linkClass('/')}>
             <LayoutDashboard size={20} className="text-saffron" /> Dashboard
           </Link>
+          {(role === 'SUPER_ADMIN' || role === 'ADMIN') && (
+            <Link to="/responses" className={linkClass('/responses')}>
+              <FileText size={20} className="text-saffron" /> Responses
+            </Link>
+          )}
           {(role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'EDITOR') && (
             <Link to="/surveys" className={linkClass('/surveys')}>
               <FileText size={20} className="text-saffron" /> Surveys
