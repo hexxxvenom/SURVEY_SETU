@@ -10,18 +10,18 @@ export const Devices = () => {
   const [showModal, setShowModal] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // New Device Form State
   const [formData, setFormData] = useState({ device_identifier: '' });
 
   const fetchDevices = async () => {
     setLoading(true);
     try {
+      console.log(`[DEBUG] Fetching devices from: ${API_URL}/admin/devices`);
       const res = await axios.get(`${API_URL}/admin/devices`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDevices(res.data.data);
-    } catch (err) {
-      console.error("Failed to fetch devices");
+    } catch (err: any) {
+      console.error("[ERROR] Failed to fetch devices:", err.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -34,27 +34,32 @@ export const Devices = () => {
   const handleRegisterDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log(`[DEBUG] Registering device:`, formData);
       await axios.post(`${API_URL}/admin/devices`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowModal(false);
       setFormData({ device_identifier: '' });
       fetchDevices();
-    } catch (err) {
-      alert("Failed to register device.");
+    } catch (err: any) {
+      console.error("[ERROR] Device registration failed:", err.response?.data || err.message);
+      alert(`Registration failed: ${err.response?.data?.error || err.message}`);
     }
   };
 
   const toggleLock = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+    console.log(`[DEBUG] Toggling lock for device ${id} to ${newStatus}`);
     try {
-      await axios.patch(`${API_URL}/admin/devices/${id}/status`,
+      const res = await axios.patch(`${API_URL}/admin/devices/${id}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      console.log(`[DEBUG] Toggle success:`, res.data);
       fetchDevices();
-    } catch (err) {
-      alert("Failed to update status");
+    } catch (err: any) {
+      console.error("[ERROR] Toggle lock failed:", err.response?.data || err.message);
+      alert(`Failed to update status: ${err.response?.data?.error || err.message}`);
     }
   };
 
@@ -108,7 +113,6 @@ export const Devices = () => {
         {devices.length === 0 && <div className="p-10 text-center text-gray-400 italic">No registered devices.</div>}
       </div>
 
-      {/* Register Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -123,9 +127,6 @@ export const Devices = () => {
                   placeholder="e.g., DEV-DEMO-001"
                   value={formData.device_identifier} onChange={e => setFormData({...formData, device_identifier: e.target.value})}/>
               </div>
-              <p className="text-[10px] text-gray-400 italic mt-2">
-                Note: Once registered, you must assign a surveyor to this device in the Users section.
-              </p>
               <button className="w-full bg-ashoka text-white py-3 rounded font-bold hover:bg-blue-800 mt-4 transition-colors">
                 Authorize Hardware
               </button>
