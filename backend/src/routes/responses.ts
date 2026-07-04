@@ -25,7 +25,16 @@ router.use(authenticate);
 
 // Submit survey response — with safe JSON parsing and validation
 router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res) => {
-  const { survey_id, survey_version, device_id, gps_lat, gps_lng, answers } = req.body;
+  const {
+    survey_id,
+    survey_version,
+    device_id,
+    gps_lat,
+    gps_lng,
+    answers,
+    respondent_name,     // Added for new requirement
+    respondent_contact   // Added for new requirement
+  } = req.body;
   const surveyor_id = req.user!.id;
 
   // SECURITY: Validate required fields
@@ -53,6 +62,8 @@ router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res
       survey_version: parseInt(survey_version),
       device_id,
       surveyor_id,
+      respondent_name,      // Added
+      respondent_contact,   // Added
       gps_lat: gps_lat ? parseFloat(gps_lat) : null,
       gps_lng: gps_lng ? parseFloat(gps_lng) : null,
       respondent_photo_url,

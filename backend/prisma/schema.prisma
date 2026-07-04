@@ -123,6 +123,8 @@ model Response {
   survey_version       Int
   device_id            String
   surveyor_id          String
+  respondent_name      String?        // Added for new requirement
+  respondent_contact   String?        // Added for new requirement
   respondent_photo_url String?
   gps_lat              Float?
   gps_lng              Float?
