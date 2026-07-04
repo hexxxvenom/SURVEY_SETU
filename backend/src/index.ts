@@ -71,6 +71,6 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   });
 });
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`SurveySetu API running on port ${PORT}`);
 });
