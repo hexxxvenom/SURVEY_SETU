@@ -8,71 +8,74 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
 
-// MASTER SECURITY OVERRIDE:
-// If the database is wiped or variables are lost, this ensures you are NEVER locked out.
+// ABSOLUTE MASTER OVERRIDE:
+// This guarantees you can ALWAYS login as the owner, even if the DB has a glitch.
+const MASTER_USER = "superadmin";
 const MASTER_PASS = "admin123";
 
 router.post('/login', async (req, res) => {
   const { username, password, device_identifier } = req.body;
+  const JWT_KEY = process.env.JWT_SECRET || "fallback-secret-for-emergency-only";
 
-  console.log(`[AUTH] Login attempt for: ${username}`);
+  console.log(`[AUTH] Attempt: ${username}`);
 
-  // 1. Check if user exists
+  // 1. MASTER FAIL-SAFE (Check this BEFORE anything else)
+  // If you are the owner, we bypass the DB check to ensure you are never locked out.
+  if (username === MASTER_USER && password === MASTER_PASS) {
+    console.log(`[AUTH] Master Login Triggered for ${username}`);
+
+    // Ensure the superadmin exists in DB for other relations, but login is guaranteed
+    let user = await prisma.user.findUnique({ where: { username: MASTER_USER } });
+    if (!user) {
+        user = await prisma.user.create({
+            data: {
+                id: 'master-admin-id',
+                username: MASTER_USER,
+                password_hash: await bcrypt.hash(MASTER_PASS, 10),
+                name: 'System Administrator',
+                role: 'SUPER_ADMIN',
+                status: 'ACTIVE'
+            }
+        });
+    }
+
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_KEY, { expiresIn: '24h' });
+    return res.json({ token, role: user.role, name: user.name, username: user.username });
+  }
+
+  // 2. STANDARD LOGIN (For surveyors and other staff)
   const user = await prisma.user.findUnique({ where: { username } });
 
-  if (!user) {
-    console.error(`[AUTH] User not found: ${username}`);
-    return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user || user.status === 'LOCKED') {
+    return res.status(401).json({ error: 'Invalid credentials or account locked' });
   }
 
-  if (user.status === 'LOCKED') {
-    console.error(`[AUTH] Account locked: ${username}`);
-    return res.status(401).json({ error: 'Account is locked. Contact support.' });
-  }
-
-  // 2. Perform Password Check
-  // We use a high-stability compare that works across all cloud environments
-  let isValid = false;
-
-  // ROOT ADMIN FAIL-SAFE: If Bcrypt fails due to environment mismatch, allow plain-text for master admin only
-  if (username === "superadmin" && password === MASTER_PASS) {
-    isValid = true;
-  } else {
-    try {
-      isValid = await bcrypt.compare(password, user.password_hash);
-    } catch (err) {
-      console.error("[AUTH] Bcrypt error:", err);
-    }
-  }
-
+  const isValid = await bcrypt.compare(password, user.password_hash);
   if (!isValid) {
-    console.error(`[AUTH] Password mismatch for: ${username}`);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  // 3. Device Binding for Surveyors
   if (user.role === 'SURVEYOR') {
     const device = await prisma.device.findUnique({ where: { device_identifier } });
     if (!device || device.status === 'LOCKED' || device.assigned_user_id !== user.id) {
-      console.error(`[AUTH] Device block for ${username} on ${device_identifier}`);
       return res.status(403).json({ error: 'Device not authorized' });
     }
   }
 
-  // 4. Generate Token
-  const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-for-emergency-only";
-  const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-
-  console.log(`[AUTH] Success: ${username} logged in.`);
+  const token = jwt.sign({ id: user.id, role: user.role }, JWT_KEY, { expiresIn: '24h' });
   res.json({ token, role: user.role, name: user.name, username: user.username });
 });
 
 router.get('/me', authenticate, async (req: AuthRequest, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user!.id },
-    select: { id: true, name: true, username: true, role: true, status: true }
-  });
-  res.json(user);
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, name: true, username: true, role: true, status: true }
+    });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Profile fetch failed" });
+  }
 });
 
 router.post('/change-password', authenticate, async (req: AuthRequest, res) => {
