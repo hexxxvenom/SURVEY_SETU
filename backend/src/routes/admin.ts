@@ -5,7 +5,6 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
-// Only Super Admin and Admin can access
 router.use(authenticate, authorize(['SUPER_ADMIN', 'ADMIN']));
 
 // --- User Management ---
@@ -22,11 +21,10 @@ router.get('/users', async (req: AuthRequest, res) => {
   }
 });
 
-// Explicitly handle User Creation
 router.post('/users', async (req: AuthRequest, res) => {
-  const { name, username, password, role } = req.body;
+  const { name, username, password, role, linked_device_id } = req.body;
   if (!name || !username || !password || !role) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return res.status(400).json({ error: 'All core fields are required' });
   }
 
   try {
@@ -38,9 +36,19 @@ router.post('/users', async (req: AuthRequest, res) => {
         name,
         username,
         password_hash: await bcrypt.hash(password, 10),
-        role
+        role,
+        linked_device_id: linked_device_id || null
       }
     });
+
+    // If a device was assigned, bind it in the Device table too
+    if (linked_device_id) {
+        await prisma.device.update({
+            where: { device_identifier: linked_device_id },
+            data: { assigned_user_id: user.id }
+        });
+    }
+
     res.status(201).json(user);
   } catch (error: any) {
     console.error("User creation failed:", error);
@@ -75,7 +83,6 @@ router.get('/devices', async (req: AuthRequest, res) => {
   }
 });
 
-// Explicitly handle Device Registration
 router.post('/devices', async (req: AuthRequest, res) => {
   const { device_identifier } = req.body;
   if (!device_identifier) {
@@ -91,7 +98,6 @@ router.post('/devices', async (req: AuthRequest, res) => {
     });
     res.status(201).json(device);
   } catch (error: any) {
-    console.error("Device registration failed:", error);
     res.status(500).json({ error: error.message });
   }
 });

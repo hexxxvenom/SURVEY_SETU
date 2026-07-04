@@ -4,9 +4,10 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import android.util.Log
 
 object RetrofitClient {
-    // Cloud Backend URL - Accessible from any network
+    // FORCE FULL SCHEME: Using exact HTTPS protocol with trailing slash
     private const val BASE_URL = "https://surveysetu-production.up.railway.app/"
 
     var authToken: String? = null
@@ -16,23 +17,24 @@ object RetrofitClient {
             val requestBuilder = chain.request().newBuilder()
             authToken?.let {
                 requestBuilder.addHeader("Authorization", "Bearer $it")
+                Log.d("RetrofitClient", "Request with Token: Bearer ${it.take(10)}...")
             }
             val response = chain.proceed(requestBuilder.build())
             
             // SECURITY: Handle user/device locking
             if (response.code == 401 || response.code == 403) {
-                // Clear local session data to force logout
                 authToken = null
-                // In a production app, we would use an event bus or livedata to notify the UI to navigate to login
+                Log.e("RetrofitClient", "Auth Error: ${response.code}")
             }
             response
         }
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS) // Increased for mobile networks
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     val apiService: ApiService by lazy {
+        Log.i("RetrofitClient", "Initializing with URL: $BASE_URL")
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)

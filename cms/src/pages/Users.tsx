@@ -1,48 +1,55 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { UserPlus, Lock, Unlock, Edit, Loader2, X } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Edit, Loader2, X, Smartphone } from 'lucide-react';
 
 export const Users = () => {
   const { token, role } = useAuthStore();
   const [users, setUsers] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // New User Form State
-  const [formData, setFormData] = useState({ name: '', username: '', password: '', role: 'SURVEYOR' });
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    password: '',
+    role: 'SURVEYOR',
+    linked_device_id: ''
+  });
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/admin/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUsers(res.data.data);
+      const [usersRes, devicesRes] = await Promise.all([
+        axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/admin/devices`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      setUsers(usersRes.data.data);
+      setDevices(devicesRes.data.data);
     } catch (err) {
-      console.error("Failed to fetch users");
+      console.error("Failed to fetch data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, [token, API_URL]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Note: We need a POST /admin/users endpoint in backend
       await axios.post(`${API_URL}/admin/users`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowModal(false);
-      setFormData({ name: '', username: '', password: '', role: 'SURVEYOR' });
-      fetchUsers();
-    } catch (err) {
-      alert("Failed to create user. Ensure API supports this action.");
+      setFormData({ name: '', username: '', password: '', role: 'SURVEYOR', linked_device_id: '' });
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to create user.");
     }
   };
 
@@ -53,7 +60,7 @@ export const Users = () => {
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      fetchUsers();
+      fetchData();
     } catch (err) {
       alert("Failed to update status");
     }
@@ -80,6 +87,7 @@ export const Users = () => {
               <th className="p-4 font-medium">Name</th>
               <th className="p-4 font-medium">Username</th>
               <th className="p-4 font-medium">Role</th>
+              <th className="p-4 font-medium">Device Bound</th>
               <th className="p-4 font-medium">Status</th>
               <th className="p-4 font-medium text-right">Actions</th>
             </tr>
@@ -91,6 +99,15 @@ export const Users = () => {
                 <td className="p-4 text-gray-600">{user.username}</td>
                 <td className="p-4 text-gray-600">{user.role}</td>
                 <td className="p-4">
+                  {user.linked_device_id ? (
+                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-mono border flex items-center gap-1 w-fit">
+                      <Smartphone size={10}/> {user.linked_device_id}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic text-xs">None</span>
+                  )}
+                </td>
+                <td className="p-4">
                   <span className={`px-2 py-1 text-xs font-bold rounded-full ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {user.status}
                   </span>
@@ -99,11 +116,10 @@ export const Users = () => {
                   <button className="text-ashoka hover:text-navy transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
-                  {(role === 'SUPER_ADMIN' || (role === 'ADMIN' && user.role !== 'SUPER_ADMIN')) && user.username !== 'superadmin' && (
+                  {user.username !== 'superadmin' && (
                     <button 
                       onClick={() => toggleLock(user.id, user.status)}
                       className={`${user.status === 'ACTIVE' ? 'text-orange-500 hover:text-orange-700' : 'text-green-500 hover:text-green-700'} transition-colors`}
-                      title={user.status === 'ACTIVE' ? 'Lock Account' : 'Unlock Account'}
                     >
                       {user.status === 'ACTIVE' ? <Lock size={18} /> : <Unlock size={18} />}
                     </button>
@@ -113,10 +129,8 @@ export const Users = () => {
             ))}
           </tbody>
         </table>
-        {users.length === 0 && <div className="p-10 text-center text-gray-400 italic">No users found in database.</div>}
       </div>
 
-      {/* Register Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -140,17 +154,30 @@ export const Users = () => {
                 <input required type="password" className="w-full border rounded p-2 outline-none focus:border-saffron"
                   value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Access Role</label>
-                <select className="w-full border rounded p-2 outline-none"
-                  value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
-                  <option value="SURVEYOR">Surveyor (App User)</option>
-                  <option value="EDITOR">Editor (Survey Builder)</option>
-                  <option value="ADMIN">Administrator</option>
-                </select>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
+                  <select className="w-full border rounded p-2 outline-none"
+                    value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                    <option value="SURVEYOR">Surveyor</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign Device</label>
+                  <select className="w-full border rounded p-2 outline-none"
+                    value={formData.linked_device_id} onChange={e => setFormData({...formData, linked_device_id: e.target.value})}>
+                    <option value="">No Device</option>
+                    {devices.filter(d => d.status === 'ACTIVE').map(d => (
+                      <option key={d.id} value={d.device_identifier}>{d.device_identifier}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
               <button className="w-full bg-saffron text-white py-3 rounded font-bold hover:bg-orange-500 mt-4 transition-colors">
-                Create User Account
+                Create Account & Bind Device
               </button>
             </form>
           </div>
