@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { Smartphone, Lock, Unlock, Loader2, X } from 'lucide-react';
+import { Smartphone, Lock, Unlock, Loader2, X, Trash2, Edit } from 'lucide-react';
 
 export const Devices = () => {
   const { token } = useAuthStore();
   const [devices, setDevices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<any>(null);
   const API_URL = import.meta.env.VITE_API_URL;
 
   const [formData, setFormData] = useState({ device_identifier: '' });
@@ -15,13 +16,12 @@ export const Devices = () => {
   const fetchDevices = async () => {
     setLoading(true);
     try {
-      console.log(`[DEBUG] Fetching devices from: ${API_URL}/admin/devices`);
       const res = await axios.get(`${API_URL}/admin/devices`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDevices(res.data.data);
-    } catch (err: any) {
-      console.error("[ERROR] Failed to fetch devices:", err.response?.data || err.message);
+    } catch (err) {
+      console.error("Failed to fetch devices");
     } finally {
       setLoading(false);
     }
@@ -31,35 +31,59 @@ export const Devices = () => {
     fetchDevices();
   }, [token, API_URL]);
 
-  const handleRegisterDevice = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      console.log(`[DEBUG] Registering device:`, formData);
-      await axios.post(`${API_URL}/admin/devices`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setShowModal(false);
-      setFormData({ device_identifier: '' });
+      if (editingDevice) {
+        await axios.put(`${API_URL}/admin/devices/${editingDevice.id}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}/admin/devices`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      closeModal();
       fetchDevices();
     } catch (err: any) {
-      console.error("[ERROR] Device registration failed:", err.response?.data || err.message);
-      alert(`Registration failed: ${err.response?.data?.error || err.message}`);
+      alert(err.response?.data?.error || "Operation failed.");
     }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete device "${name}"?`)) return;
+    try {
+      await axios.delete(`${API_URL}/admin/devices/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchDevices();
+    } catch (err) {
+      alert("Failed to delete device");
+    }
+  };
+
+  const openEditModal = (device: any) => {
+    setEditingDevice(device);
+    setFormData({ device_identifier: device.device_identifier });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingDevice(null);
+    setFormData({ device_identifier: '' });
   };
 
   const toggleLock = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
-    console.log(`[DEBUG] Toggling lock for device ${id} to ${newStatus}`);
     try {
-      const res = await axios.patch(`${API_URL}/admin/devices/${id}/status`,
+      await axios.patch(`${API_URL}/admin/devices/${id}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log(`[DEBUG] Toggle success:`, res.data);
       fetchDevices();
-    } catch (err: any) {
-      console.error("[ERROR] Toggle lock failed:", err.response?.data || err.message);
-      alert(`Failed to update status: ${err.response?.data?.error || err.message}`);
+    } catch (err) {
+      alert("Failed to update status");
     }
   };
 
@@ -97,38 +121,43 @@ export const Devices = () => {
                     {device.status}
                   </span>
                 </td>
-                <td className="p-4 text-right">
+                <td className="p-4 text-right flex justify-end gap-3">
+                  <button onClick={() => openEditModal(device)} className="text-ashoka hover:text-navy transition-colors" title="Edit">
+                    <Edit size={18} />
+                  </button>
                   <button 
                     onClick={() => toggleLock(device.id, device.status)}
                     className={`${device.status === 'ACTIVE' ? 'text-orange-500 hover:text-orange-700' : 'text-green-500 hover:text-green-700'} transition-colors`}
-                    title={device.status === 'ACTIVE' ? 'Lock Device' : 'Unlock Device'}
+                    title="Lock/Unlock"
                   >
                     {device.status === 'ACTIVE' ? <Lock size={18} /> : <Unlock size={18} />}
+                  </button>
+                  <button onClick={() => handleDelete(device.id, device.device_identifier)} className="text-red-500 hover:text-red-700" title="Delete">
+                    <Trash2 size={18} />
                   </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {devices.length === 0 && <div className="p-10 text-center text-gray-400 italic">No registered devices.</div>}
       </div>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="bg-navy p-4 text-white flex justify-between items-center">
-              <h2 className="font-bold">Hardware Registration</h2>
-              <button onClick={() => setShowModal(false)}><X size={20}/></button>
+              <h2 className="font-bold">{editingDevice ? 'Edit Hardware' : 'Hardware Registration'}</h2>
+              <button onClick={closeModal}><X size={20}/></button>
             </div>
-            <form onSubmit={handleRegisterDevice} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Device ID / Serial / IMEI</label>
-                <input required className="w-full border rounded p-2 outline-none focus:border-saffron font-mono"
+                <input required className="w-full border rounded p-2 outline-none font-mono"
                   placeholder="e.g., DEV-DEMO-001"
                   value={formData.device_identifier} onChange={e => setFormData({...formData, device_identifier: e.target.value})}/>
               </div>
               <button className="w-full bg-ashoka text-white py-3 rounded font-bold hover:bg-blue-800 mt-4 transition-colors">
-                Authorize Hardware
+                {editingDevice ? 'Update Hardware' : 'Authorize Hardware'}
               </button>
             </form>
           </div>

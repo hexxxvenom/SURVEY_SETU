@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { UserPlus, Lock, Unlock, Edit, Loader2, X, Smartphone } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Edit, Loader2, X, Smartphone, Trash2 } from 'lucide-react';
 
 export const Users = () => {
-  const { token, role } = useAuthStore();
+  const { token } = useAuthStore();
   const [users, setUsers] = useState<any[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
   const API_URL = import.meta.env.VITE_API_URL;
 
   const [formData, setFormData] = useState({
@@ -39,18 +40,54 @@ export const Users = () => {
     fetchData();
   }, [token, API_URL]);
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/admin/users`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setShowModal(false);
-      setFormData({ name: '', username: '', password: '', role: 'SURVEYOR', linked_device_id: '' });
+      if (editingUser) {
+        await axios.put(`${API_URL}/admin/users/${editingUser.id}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}/admin/users`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      closeModal();
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to create user.");
+      alert(err.response?.data?.error || "Operation failed.");
     }
+  };
+
+  const handleDelete = async (id: string, username: string) => {
+    if (username === 'superadmin') return alert("Cannot delete root superadmin");
+    if (!window.confirm(`Are you sure you want to delete user "${username}"?`)) return;
+    try {
+      await axios.delete(`${API_URL}/admin/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData();
+    } catch (err) {
+      alert("Failed to delete user");
+    }
+  };
+
+  const openEditModal = (user: any) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      username: user.username,
+      password: '', // Leave blank unless changing
+      role: user.role,
+      linked_device_id: user.linked_device_id || ''
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData({ name: '', username: '', password: '', role: 'SURVEYOR', linked_device_id: '' });
   };
 
   const toggleLock = async (id: string, currentStatus: string) => {
@@ -113,16 +150,22 @@ export const Users = () => {
                   </span>
                 </td>
                 <td className="p-4 text-right flex justify-end gap-3">
-                  <button className="text-ashoka hover:text-navy transition-colors" title="Edit">
+                  <button onClick={() => openEditModal(user)} className="text-ashoka hover:text-navy transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
                   {user.username !== 'superadmin' && (
-                    <button 
-                      onClick={() => toggleLock(user.id, user.status)}
-                      className={`${user.status === 'ACTIVE' ? 'text-orange-500 hover:text-orange-700' : 'text-green-500 hover:text-green-700'} transition-colors`}
-                    >
-                      {user.status === 'ACTIVE' ? <Lock size={18} /> : <Unlock size={18} />}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => toggleLock(user.id, user.status)}
+                        className={`${user.status === 'ACTIVE' ? 'text-orange-500 hover:text-orange-700' : 'text-green-500 hover:text-green-700'} transition-colors`}
+                        title="Lock/Unlock"
+                      >
+                        {user.status === 'ACTIVE' ? <Lock size={18} /> : <Unlock size={18} />}
+                      </button>
+                      <button onClick={() => handleDelete(user.id, user.username)} className="text-red-500 hover:text-red-700" title="Delete">
+                        <Trash2 size={18} />
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>
@@ -133,25 +176,25 @@ export const Users = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="bg-navy p-4 text-white flex justify-between items-center">
-              <h2 className="font-bold">Register New System User</h2>
-              <button onClick={() => setShowModal(false)}><X size={20}/></button>
+              <h2 className="font-bold">{editingUser ? 'Edit User' : 'Register New User'}</h2>
+              <button onClick={closeModal}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
-                <input required className="w-full border rounded p-2 outline-none focus:border-saffron"
+                <input required className="w-full border rounded p-2 outline-none"
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Username</label>
-                <input required className="w-full border rounded p-2 outline-none focus:border-saffron"
+                <input required className="w-full border rounded p-2 outline-none bg-gray-50" disabled={!!editingUser}
                   value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Initial Password</label>
-                <input required type="password" className="w-full border rounded p-2 outline-none focus:border-saffron"
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingUser ? 'New Password (Optional)' : 'Initial Password'}</label>
+                <input type="password" className="w-full border rounded p-2 outline-none"
                   value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               </div>
 
@@ -177,7 +220,7 @@ export const Users = () => {
               </div>
 
               <button className="w-full bg-saffron text-white py-3 rounded font-bold hover:bg-orange-500 mt-4 transition-colors">
-                Create Account & Bind Device
+                {editingUser ? 'Update Account' : 'Create Account'}
               </button>
             </form>
           </div>

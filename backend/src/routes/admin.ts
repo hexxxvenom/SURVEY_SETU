@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
+// Only Super Admin and Admin can access
 router.use(authenticate, authorize(['SUPER_ADMIN', 'ADMIN']));
 
 // --- User Management ---
@@ -41,7 +42,6 @@ router.post('/users', async (req: AuthRequest, res) => {
       }
     });
 
-    // If a device was assigned, bind it in the Device table too
     if (linked_device_id) {
         await prisma.device.update({
             where: { device_identifier: linked_device_id },
@@ -51,9 +51,36 @@ router.post('/users', async (req: AuthRequest, res) => {
 
     res.status(201).json(user);
   } catch (error: any) {
-    console.error("User creation failed:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Update User (Edit)
+router.put('/users/:id', async (req: AuthRequest, res) => {
+    const { name, role, linked_device_id, password } = req.body;
+    try {
+        const updateData: any = { name, role, linked_device_id: linked_device_id || null };
+        if (password) {
+            updateData.password_hash = await bcrypt.hash(password, 10);
+        }
+        const user = await prisma.user.update({
+            where: { id: req.params.id },
+            data: updateData
+        });
+        res.json(user);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete User
+router.delete('/users/:id', async (req: AuthRequest, res) => {
+    try {
+        await prisma.user.delete({ where: { id: req.params.id } });
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 router.patch('/users/:id/status', async (req: AuthRequest, res) => {
@@ -100,6 +127,30 @@ router.post('/devices', async (req: AuthRequest, res) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Update Device (Edit)
+router.put('/devices/:id', async (req: AuthRequest, res) => {
+    const { device_identifier } = req.body;
+    try {
+        const device = await prisma.device.update({
+            where: { id: req.params.id },
+            data: { device_identifier }
+        });
+        res.json(device);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete Device
+router.delete('/devices/:id', async (req: AuthRequest, res) => {
+    try {
+        await prisma.device.delete({ where: { id: req.params.id } });
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 router.patch('/devices/:id/status', async (req: AuthRequest, res) => {
