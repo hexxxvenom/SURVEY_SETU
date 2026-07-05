@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.util.Log
 
 sealed class SurveyState {
     object Loading : SurveyState()
@@ -26,29 +27,37 @@ class SurveyViewModel(
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     init {
+        // ALWAYS attempt to load local first, but trigger sync if local is empty
         loadLocalSurvey(triggerSyncIfEmpty = true)
     }
 
     fun loadLocalSurvey(triggerSyncIfEmpty: Boolean = false) {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
-            val survey = surveyDao.getActiveSurvey()
-            if (survey != null) {
-                val questions = surveyDao.getQuestionsForSurvey(survey.id)
-                val uiQuestions = questions.map { q ->
-                    val options = surveyDao.getOptionsForQuestion(q.id)
-                    QuestionUiModel(
-                        id = q.id,
-                        text = q.questionText,
-                        isMandatory = q.isMandatory,
-                        options = options.map { o -> OptionUiModel(o.id, o.optionText) }
-                    )
+            try {
+                val survey = surveyDao.getActiveSurvey()
+                if (survey != null) {
+                    val questions = surveyDao.getQuestionsForSurvey(survey.id)
+                    val uiQuestions = questions.map { q ->
+                        val options = surveyDao.getOptionsForQuestion(q.id)
+                        QuestionUiModel(
+                            id = q.id,
+                            text = q.questionText,
+                            isMandatory = q.isMandatory,
+                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                        )
+                    }
+                    _surveyState.value = SurveyState.Success(survey, uiQuestions)
+                    Log.d("SurveyViewModel", "Successfully loaded local survey: ${survey.title}")
+                } else if (triggerSyncIfEmpty) {
+                    Log.i("SurveyViewModel", "Local DB empty. Triggering automatic cloud sync...")
+                    syncSurveys()
+                } else {
+                    _surveyState.value = SurveyState.Error("No active survey found. Click Sync to fetch from cloud.")
                 }
-                _surveyState.value = SurveyState.Success(survey, uiQuestions)
-            } else if (triggerSyncIfEmpty) {
-                syncSurveys()
-            } else {
-                _surveyState.value = SurveyState.Error("No active survey cached. Please sync.")
+            } catch (e: Exception) {
+                Log.e("SurveyViewModel", "Local load error", e)
+                _surveyState.value = SurveyState.Error("Database Error: ${e.message}")
             }
         }
     }
@@ -56,11 +65,15 @@ class SurveyViewModel(
     fun syncSurveys() {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
+            Log.i("SurveyViewModel", "Starting Cloud Sync...")
             val result = repository.syncActiveSurveys()
             if (result.isSuccess) {
+                Log.i("SurveyViewModel", "Sync Successful. Reloading local data.")
                 loadLocalSurvey(triggerSyncIfEmpty = false)
             } else {
-                _surveyState.value = SurveyState.Error("Sync failed: ${result.exceptionOrNull()?.message}")
+                val error = result.exceptionOrNull()?.message ?: "Unknown Sync Error"
+                Log.e("SurveyViewModel", "Sync Failed: $error")
+                _surveyState.value = SurveyState.Error("Sync failed: $error")
             }
         }
     }
