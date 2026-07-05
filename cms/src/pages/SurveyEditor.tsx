@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Save, ArrowLeft } from 'lucide-react';
+import axios from 'axios';
+import { useAuthStore } from '../store';
+import { Plus, Trash2, Save, ArrowLeft, Loader2 } from 'lucide-react';
 
 interface Option { id: string; text: string; order: number; }
 interface Question { id: string; text: string; options: Option[]; isMandatory: boolean; order: number; }
 
 export const SurveyEditor = () => {
   const navigate = useNavigate();
+  const { token } = useAuthStore();
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState('en');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const addQuestion = () => {
     setQuestions([
@@ -64,75 +70,92 @@ export const SurveyEditor = () => {
   };
 
   const saveSurvey = async (publish: boolean) => {
-    console.log({ title, language, status: publish ? 'PUBLISHED' : 'DRAFT', questions });
-    navigate('/surveys');
+    if (!title) return alert("Please enter a survey title");
+    if (questions.length === 0) return alert("Please add at least one question");
+
+    setSaving(true);
+    try {
+      await axios.post(`${API_URL}/surveys`, {
+        title,
+        language,
+        status: publish ? 'PUBLISHED' : 'DRAFT',
+        questions
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      navigate('/surveys');
+    } catch (err) {
+      alert("Failed to save survey. Check connection.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      <button onClick={() => navigate('/surveys')} className="flex items-center gap-2 text-gray-600 hover:text-navy mb-6">
-        <ArrowLeft size={20} /> Back to Surveys
+    <div className="max-w-4xl mx-auto pb-32 animate-in fade-in duration-500">
+      <button onClick={() => navigate('/surveys')} className="flex items-center gap-2 text-gray-400 font-bold hover:text-navy mb-8 uppercase text-xs">
+        <ArrowLeft size={16} /> Back to Library
       </button>
 
-      <div className="bg-white p-6 rounded-lg shadow mb-8 border-t-4 border-navy">
-        <h2 className="text-xl font-bold text-navy mb-4">Survey Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-10">
+        <h2 className="text-xl font-black text-navy mb-6 uppercase tracking-widest">Survey Definition</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Survey Title</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Internal Title</label>
             <input 
-              type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-navy outline-none"
-              value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Health Infrastructure 2026"
+              type="text" className="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-saffron outline-none font-bold text-navy"
+              value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Infrastructure Audit"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Primary Language</label>
             <select 
-              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-navy outline-none"
+              className="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-saffron outline-none font-bold text-navy"
               value={language} onChange={e => setLanguage(e.target.value)}
             >
-              <option value="en">English</option>
+              <option value="en">English (Universal)</option>
               <option value="hi">Hindi (हिंदी)</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {questions.map((q, qIndex) => (
-          <div key={q.id} className="bg-white p-6 rounded-lg shadow relative border border-gray-100">
-            <div className="absolute top-4 right-4 flex gap-2">
-              <button onClick={() => removeQuestion(q.id)} className="text-red-500 p-1 hover:bg-red-50 rounded" title="Delete Question">
-                <Trash2 size={18} />
+          <div key={q.id} className="bg-white p-8 rounded-3xl shadow-sm relative border border-gray-100 group hover:border-ashoka/30 transition-all">
+            <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => removeQuestion(q.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-xl" title="Delete Question">
+                <Trash2 size={20} />
               </button>
             </div>
             
-            <div className="mb-4 pr-12">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Question {qIndex + 1}</label>
+            <div className="mb-6 pr-12">
+              <span className="text-[10px] font-black text-ashoka uppercase tracking-widest mb-2 block">Question {qIndex + 1}</span>
               <input 
-                type="text" className="w-full border-b-2 border-gray-200 p-2 focus:border-ashoka outline-none text-lg"
-                value={q.text} onChange={e => updateQuestionText(q.id, e.target.value)} placeholder="Enter question text here..."
+                type="text" className="w-full border-b-2 border-gray-100 p-2 focus:border-ashoka outline-none text-xl font-black text-navy placeholder:text-gray-200"
+                value={q.text} onChange={e => updateQuestionText(q.id, e.target.value)} placeholder="What is your primary concern?"
               />
             </div>
 
-            <div className="mb-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={q.isMandatory} onChange={() => toggleMandatory(q.id)} className="w-4 h-4 text-ashoka" />
-                <span className="text-sm text-gray-600">Mandatory Question</span>
+            <div className="mb-8">
+              <label className="flex items-center gap-3 cursor-pointer group/check w-fit">
+                <input type="checkbox" checked={q.isMandatory} onChange={() => toggleMandatory(q.id)} className="w-5 h-5 rounded-lg border-2 border-gray-200 text-ashoka focus:ring-0" />
+                <span className="text-xs font-bold text-gray-400 uppercase group-hover/check:text-navy transition-colors tracking-widest">Mark as Mandatory</span>
               </label>
             </div>
 
-            <div className="ml-4 space-y-3">
+            <div className="space-y-4">
               {q.options.map((opt, oIndex) => (
-                <div key={opt.id} className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center text-xs font-bold text-gray-400">
+                <div key={opt.id} className="flex items-center gap-4 bg-gray-50/50 p-2 rounded-2xl border border-transparent hover:border-gray-200 transition-all">
+                  <div className="w-8 h-8 rounded-xl bg-white border-2 border-gray-100 flex items-center justify-center text-xs font-black text-gray-300">
                     {String.fromCharCode(65 + oIndex)}
                   </div>
                   <input 
-                    type="text" className="flex-1 border border-gray-200 rounded p-2 focus:border-ashoka outline-none text-sm"
-                    value={opt.text} onChange={e => updateOptionText(q.id, opt.id, e.target.value)} placeholder={`Option ${oIndex + 1}`}
+                    type="text" className="flex-1 bg-transparent border-none outline-none text-sm font-bold text-navy py-2"
+                    value={opt.text} onChange={e => updateOptionText(q.id, opt.id, e.target.value)} placeholder={`Label for Option ${oIndex + 1}`}
                   />
                   {q.options.length > 2 && (
-                    <button onClick={() => removeOption(q.id, opt.id)} className="text-red-400 hover:text-red-600">
+                    <button onClick={() => removeOption(q.id, opt.id)} className="text-gray-300 hover:text-red-400 px-2 transition-colors">
                       <Trash2 size={16} />
                     </button>
                   )}
@@ -140,8 +163,8 @@ export const SurveyEditor = () => {
               ))}
               
               {q.options.length < 4 && (
-                <button onClick={() => addOption(q.id)} className="text-sm text-ashoka font-medium flex items-center gap-1 mt-2 hover:underline">
-                  <Plus size={16} /> Add Option (Max 4)
+                <button onClick={() => addOption(q.id)} className="text-[10px] text-ashoka font-black uppercase tracking-widest flex items-center gap-2 mt-4 hover:brightness-75 bg-ashoka/5 px-4 py-2 rounded-full transition-all">
+                  <Plus size={14} /> Extend Choice Array
                 </button>
               )}
             </div>
@@ -151,17 +174,29 @@ export const SurveyEditor = () => {
 
       <button 
         onClick={addQuestion}
-        className="w-full mt-6 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-saffron hover:text-saffron transition-colors flex items-center justify-center gap-2"
+        className="w-full mt-10 py-8 border-4 border-dashed border-gray-100 rounded-[2.5rem] text-gray-300 font-black uppercase tracking-[0.3em] hover:border-saffron/30 hover:text-saffron transition-all flex flex-col items-center justify-center gap-4 group"
       >
-        <Plus size={20} /> Add New Question
+        <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-saffron/10 transition-colors">
+            <Plus size={32} />
+        </div>
+        Append Data Point
       </button>
 
-      <div className="fixed bottom-0 left-64 right-0 p-4 bg-white border-t border-gray-200 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button onClick={() => saveSurvey(false)} className="px-6 py-2 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50">
-          Save as Draft
+      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md border border-gray-100 p-2 rounded-2xl flex gap-2 shadow-2xl z-50">
+        <button
+            disabled={saving}
+            onClick={() => saveSurvey(false)}
+            className="px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] text-gray-400 hover:bg-gray-50 transition-all disabled:opacity-50"
+        >
+          Retain as Draft
         </button>
-        <button onClick={() => saveSurvey(true)} className="px-6 py-2 bg-navy text-white rounded font-medium hover:bg-blue-900 flex items-center gap-2">
-          <Save size={18} /> Publish Survey
+        <button
+            disabled={saving}
+            onClick={() => saveSurvey(true)}
+            className="px-10 py-3 bg-navy text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-lg hover:bg-blue-900 active:scale-95 transition-all disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>}
+          Commit & Broadcast (Publish)
         </button>
       </div>
     </div>
