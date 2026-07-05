@@ -24,7 +24,6 @@ fun LoginScreen(
     viewModel: LoginViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    // Capture the hardware-unique Android ID (Modern alternative to IMEI)
     val hardwareId = remember { 
         Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN"
     }
@@ -33,6 +32,7 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
 
     val loginState by viewModel.loginState.collectAsState()
+    val appTitle by viewModel.appTitle.collectAsState()
 
     LaunchedEffect(loginState) {
         if (loginState is LoginState.Success) {
@@ -54,8 +54,10 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "SurveySetu Login",
+                text = appTitle, // DYNAMIC TITLE FROM CMS
                 style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Black,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -93,23 +95,20 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = {
-                    // Automatically use the physical Hardware ID for login
-                    viewModel.login(username, password, hardwareId)
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                onClick = { viewModel.login(username, password, hardwareId) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = MaterialTheme.shapes.large,
                 enabled = loginState !is LoginState.Loading
             ) {
                 if (loginState is LoginState.Loading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
-                    Text("Secure Login")
+                    Text("AUTHORIZE & LOGIN")
                 }
             }
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Display the current device's hardware ID so it can be registered in CMS
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = MaterialTheme.shapes.medium,

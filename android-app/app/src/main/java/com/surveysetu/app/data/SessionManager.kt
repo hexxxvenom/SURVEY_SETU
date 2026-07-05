@@ -20,6 +20,10 @@ class SessionManager(context: Context) {
     fun getUserName(): String? = prefs.getString("user_name", null)
     fun getUserId(): String? = prefs.getString("user_id", null)
 
+    fun getDeviceId(context: Context): String {
+        return android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "UNKNOWN"
+    }
+
     fun clearSession() {
         prefs.edit().clear().apply()
     }

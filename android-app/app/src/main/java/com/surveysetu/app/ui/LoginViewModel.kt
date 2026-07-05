@@ -21,6 +21,26 @@ class LoginViewModel : ViewModel() {
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
+    private val _appTitle = MutableStateFlow("SurveySetu Login")
+    val appTitle: StateFlow<String> = _appTitle.asStateFlow()
+
+    init {
+        fetchAppBranding()
+    }
+
+    fun fetchAppBranding() {
+        viewModelScope.launch {
+            try {
+                val res = RetrofitClient.apiService.getAppBranding()
+                if (res.isSuccessful) {
+                    _appTitle.value = res.body()?.title ?: "SurveySetu Login"
+                }
+            } catch (e: Exception) {
+                // Keep default on error
+            }
+        }
+    }
+
     fun login(username: String, password: String, deviceId: String) {
         if (username.isBlank() || password.isBlank() || deviceId.isBlank()) {
             _loginState.value = LoginState.Error("Please fill in all fields")
@@ -36,8 +56,6 @@ class LoginViewModel : ViewModel() {
                 
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
-                    
-                    // Save real session data (Role, Name, Username)
                     DatabaseProvider.sessionManager.saveSession(
                         token = body.token, 
                         role = body.role,
@@ -45,14 +63,13 @@ class LoginViewModel : ViewModel() {
                         username = body.username
                     )
                     RetrofitClient.authToken = body.token
-                    
                     _loginState.value = LoginState.Success(body.token, body.role)
                 } else {
-                    val errorString = response.errorBody()?.string() ?: "Unknown error"
+                    val errorString = response.errorBody()?.string() ?: "Invalid Credentials"
                     _loginState.value = LoginState.Error("Login failed: $errorString")
                 }
             } catch (e: Exception) {
-                _loginState.value = LoginState.Error(e.localizedMessage ?: "Network error")
+                _loginState.value = LoginState.Error("Network error: Cannot reach cloud server")
             }
         }
     }

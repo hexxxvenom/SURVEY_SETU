@@ -10,7 +10,12 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    // --- New Attendance Endpoints ---
+    @GET("auth/me")
+    suspend fun getMe(): Response<UserResponse>
+
+    @GET("config/app-branding")
+    suspend fun getAppBranding(): Response<BrandingResponse>
+
     @Multipart
     @POST("attendance/clock-in")
     suspend fun clockIn(
@@ -23,7 +28,6 @@ interface ApiService {
     @POST("attendance/clock-out")
     suspend fun clockOut(): Response<Unit>
 
-    // --- Survey Endpoints ---
     @GET("surveys/active")
     suspend fun getActiveSurveys(): Response<List<SurveyResponse>>
 
@@ -47,6 +51,9 @@ interface ApiService {
         @Query("pageSize") pageSize: Int
     ): Response<HistoryResponse>
 }
+
+data class BrandingResponse(val title: String)
+data class UserResponse(val status: String)
 
 data class HistoryResponse(
     val data: List<ResponseEntity>,

@@ -4,13 +4,13 @@ import androidx.compose.runtime.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.surveysetu.app.data.DatabaseProvider
 import com.surveysetu.app.data.SurveyEntity
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     
-    // State to persist survey session data across screens
     var selectedSurvey by remember { mutableStateOf<SurveyEntity?>(null) }
     var respondentName by remember { mutableStateOf("") }
     var respondentContact by remember { mutableStateOf("") }
@@ -22,7 +22,7 @@ fun AppNavigation() {
         }
         
         composable("selfie") {
-            SelfieScreen(onClockInSuccess = {
+            SelfieScreen(onClockInSuccess = { 
                 navController.navigate("dashboard") {
                     popUpTo("login") { inclusive = true }
                 }
@@ -34,6 +34,12 @@ fun AppNavigation() {
                 onSurveySelected = { survey ->
                     selectedSurvey = survey
                     navController.navigate("respondent_details")
+                },
+                onLogout = {
+                    DatabaseProvider.sessionManager.clearSession()
+                    navController.navigate("login") {
+                        popUpTo(0)
+                    }
                 }
             )
         }
@@ -59,12 +65,10 @@ fun AppNavigation() {
         }
         
         composable("preview") {
-            // Fetch questions from Success state of ViewModel or pass from SurveyScreen
-            // For simplicity, using a dummy or shared ViewModel state
             SurveyPreviewScreen(
                 respondentName = respondentName,
                 respondentContact = respondentContact,
-                questions = emptyList(), // This needs proper data flow
+                questions = emptyList(), // Needs fetch logic
                 answers = surveyAnswers,
                 onPrintRequested = { navController.navigate("print_settings") },
                 onFinish = {
@@ -77,8 +81,7 @@ fun AppNavigation() {
         
         composable("print_settings") {
             PrintSettingsScreen(
-                onPrint = { size, font ->
-                    // Handle actual print logic
+                onPrint = { _, _ ->
                     navController.navigate("dashboard") {
                         popUpTo("dashboard") { inclusive = true }
                     }

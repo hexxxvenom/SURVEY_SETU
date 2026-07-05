@@ -27,7 +27,6 @@ class SurveyViewModel(
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     init {
-        // ALWAYS attempt to load local first, but trigger sync if local is empty
         loadLocalSurvey(triggerSyncIfEmpty = true)
     }
 
@@ -35,6 +34,13 @@ class SurveyViewModel(
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
             try {
+                // REAL-TIME SECURITY LOCK: Force check cloud status
+                val me = RetrofitClient.apiService.getMe()
+                if (me.code() == 401 || me.code() == 403 || me.body()?.status == "LOCKED") {
+                    _surveyState.value = SurveyState.Error("ACCOUNT_LOCKED")
+                    return@launch
+                }
+
                 val survey = surveyDao.getActiveSurvey()
                 if (survey != null) {
                     val questions = surveyDao.getQuestionsForSurvey(survey.id)
@@ -48,16 +54,19 @@ class SurveyViewModel(
                         )
                     }
                     _surveyState.value = SurveyState.Success(survey, uiQuestions)
-                    Log.d("SurveyViewModel", "Successfully loaded local survey: ${survey.title}")
                 } else if (triggerSyncIfEmpty) {
-                    Log.i("SurveyViewModel", "Local DB empty. Triggering automatic cloud sync...")
                     syncSurveys()
                 } else {
-                    _surveyState.value = SurveyState.Error("No active survey found. Click Sync to fetch from cloud.")
+                    _surveyState.value = SurveyState.Error("No active survey found. Click Sync.")
                 }
             } catch (e: Exception) {
-                Log.e("SurveyViewModel", "Local load error", e)
-                _surveyState.value = SurveyState.Error("Database Error: ${e.message}")
+                // Fallback to local if totally offline, but local load is only allowed if already synced
+                val local = surveyDao.getActiveSurvey()
+                if (local != null) {
+                    loadLocalSurvey(false)
+                } else {
+                    _surveyState.value = SurveyState.Error("Cloud connection required for first shift.")
+                }
             }
         }
     }
@@ -65,37 +74,34 @@ class SurveyViewModel(
     fun syncSurveys() {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
-            Log.i("SurveyViewModel", "Starting Cloud Sync...")
             val result = repository.syncActiveSurveys()
             if (result.isSuccess) {
-                Log.i("SurveyViewModel", "Sync Successful. Reloading local data.")
                 loadLocalSurvey(triggerSyncIfEmpty = false)
             } else {
-                val error = result.exceptionOrNull()?.message ?: "Unknown Sync Error"
-                Log.e("SurveyViewModel", "Sync Failed: $error")
-                _surveyState.value = SurveyState.Error("Sync failed: $error")
+                _surveyState.value = SurveyState.Error("Sync failed. Check cloud connection.")
             }
         }
     }
 
     fun submitSurvey(
         survey: SurveyEntity, 
-        answers: List<AnswerUiModel>, 
-        photoPath: String?,
-        gps: Pair<Double, Double>?,
+        answers: Map<String, String>, 
+        respondentName: String,
+        respondentContact: String,
         onComplete: () -> Unit
     ) {
         _isSubmitting.value = true
         viewModelScope.launch {
+            val answerList = answers.map { AnswerUiModel(it.key, it.value) }
             repository.saveResponseLocally(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = "DEVICE_ID_PLACEHOLDER", 
-                surveyorId = "SURVEYOR_ID_PLACEHOLDER",
-                lat = gps?.first,
-                lng = gps?.second,
-                photoPath = photoPath,
-                answers = answers
+                deviceId = "HW_DETECTION_ACTIVE", 
+                surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "UNKNOWN",
+                lat = null,
+                lng = null,
+                photoPath = null,
+                answers = answerList
             )
             _isSubmitting.value = false
             onComplete()

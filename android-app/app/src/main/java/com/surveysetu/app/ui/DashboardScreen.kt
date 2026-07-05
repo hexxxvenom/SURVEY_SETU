@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,29 +30,39 @@ import com.surveysetu.app.data.SurveyEntity
 @Composable
 fun DashboardScreen(
     viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
-    onSurveySelected: (SurveyEntity) -> Unit
+    onSurveySelected: (SurveyEntity) -> Unit,
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val surveyState by viewModel.surveyState.collectAsState()
     
-    // FETCH REAL USER DATA FROM SESSION
     val session = remember { DatabaseProvider.sessionManager }
     val surveyorName = remember { session.getUserName() ?: "Unknown User" }
-    val surveyorId = remember { session.getUserId() ?: "ID: ---" }
+    val surveyorId = remember { session.getUserId() ?: "---" }
 
     var showPrinterDialog by remember { mutableStateOf(false) }
     var selectedPrinterName by remember { mutableStateOf("No printer selected") }
 
+    // REAL-TIME LOCK CHECK
+    LaunchedEffect(surveyState) {
+        if (surveyState is SurveyState.Error && (surveyState as SurveyState.Error).message == "ACCOUNT_LOCKED") {
+            onLogout()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("SurveySetu Dashboard") },
+                title = { Text("Surveyor Dashboard") },
                 actions = {
                     IconButton(onClick = { showPrinterDialog = true }) {
                         Icon(Icons.Default.Print, contentDescription = "Connect Printer", tint = if (selectedPrinterName.contains("No")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = { viewModel.syncSurveys() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Sync")
+                    }
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = MaterialTheme.colorScheme.error)
                     }
                 }
             )
@@ -62,7 +74,6 @@ fun DashboardScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // Surveyor Info Card (NOW DYNAMIC)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -74,7 +85,7 @@ fun DashboardScreen(
                     Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(text = surveyorName, style = MaterialTheme.typography.titleLarge)
+                        Text(text = surveyorName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                         Text(text = "User ID: $surveyorId", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -84,11 +95,11 @@ fun DashboardScreen(
                 text = selectedPrinterName,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(top = 8.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Available Surveys", style = MaterialTheme.typography.headlineSmall)
+            Text(text = "Assigned Missions", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             Spacer(modifier = Modifier.height(8.dp))
 
             when (val state = surveyState) {
@@ -98,31 +109,31 @@ fun DashboardScreen(
                     }
                 }
                 is SurveyState.Error -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(state.message, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.syncSurveys() }) {
-                            Text("Sync from Cloud")
+                    if (state.message != "ACCOUNT_LOCKED") {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(state.message, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = { viewModel.syncSurveys() }) {
+                                Text("Retry Cloud Sync")
+                            }
                         }
                     }
                 }
                 is SurveyState.Success -> {
-                    // DISPLAY ALL SYNCED SURVEYS
-                    val surveys = remember { listOf(state.survey) } // For now showing the primary active one
                     LazyColumn {
-                        items(surveys) { survey ->
+                        items(listOf(state.survey)) { survey ->
                             Card(
                                 onClick = { onSurveySelected(survey) },
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                             ) {
                                 ListItem(
-                                    headlineContent = { Text(survey.title) },
-                                    supportingContent = { Text("Version: ${survey.version}") },
-                                    trailingContent = { Text("Start >") }
+                                    headlineContent = { Text(survey.title, fontWeight = FontWeight.Bold) },
+                                    supportingContent = { Text("v${survey.version} • High-Resolution Dataset") },
+                                    trailingContent = { Icon(Icons.Default.Refresh, contentDescription = null) }
                                 )
                             }
                         }
@@ -136,7 +147,7 @@ fun DashboardScreen(
         PrinterPickerDialog(
             onDismiss = { showPrinterDialog = false },
             onPrinterSelected = { 
-                selectedPrinterName = "Connected to: $it"
+                selectedPrinterName = "Printer Ready: $it"
                 showPrinterDialog = false 
             }
         )
@@ -151,11 +162,11 @@ fun PrinterPickerDialog(onDismiss: () -> Unit, onPrinterSelected: (String) -> Un
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Thermal Printer") },
+        title = { Text("Field Printer Selection") },
         text = {
             LazyColumn {
                 if (pairedDevices.isEmpty()) {
-                    item { Text("No paired bluetooth devices found. Please pair your printer in phone settings.") }
+                    item { Text("No paired printers found. Ensure your thermal printer is turned on and paired in phone settings.") }
                 } else {
                     items(pairedDevices.toList()) { device ->
                         TextButton(
@@ -168,6 +179,6 @@ fun PrinterPickerDialog(onDismiss: () -> Unit, onPrinterSelected: (String) -> Un
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Dismiss") } }
     )
 }
