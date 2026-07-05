@@ -18,9 +18,11 @@ fun AppNavigation() {
     var surveyQuestions by remember { mutableStateOf<List<QuestionUiModel>>(emptyList()) }
     var connectedPrinterName by remember { mutableStateOf<String?>(null) }
     
-    // Print Preferences
+    // Global Print State
     var paperSize by remember { mutableIntStateOf(58) }
-    var selectedFontName by remember { mutableStateOf("Mangal") }
+    var selectedFontName by remember { mutableStateOf("Roboto") }
+    var languageMode by remember { mutableStateOf("English") }
+    var fontSize by remember { mutableIntStateOf(24) }
 
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
@@ -83,6 +85,10 @@ fun AppNavigation() {
                 printerName = connectedPrinterName,
                 paperSizeMm = paperSize,
                 fontName = selectedFontName,
+                fontSize = fontSize,
+                onConfigurePrint = {
+                    navController.navigate("print_wizard")
+                },
                 onFinish = {
                     navController.navigate("dashboard") {
                         popUpTo("dashboard") { inclusive = true }
@@ -91,14 +97,14 @@ fun AppNavigation() {
             )
         }
 
-        composable("print_settings") {
+        composable("print_wizard") {
             PrintSettingsScreen(
-                onPrint = { size, font ->
+                onPrint = { size, font, mode, scale ->
                     paperSize = size
                     selectedFontName = font
-                    navController.navigate("dashboard") {
-                        popUpTo("dashboard") { inclusive = true }
-                    }
+                    languageMode = mode
+                    fontSize = scale
+                    navController.popBackStack()
                 }
             )
         }

@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,14 +23,25 @@ fun SurveyPreviewScreen(
     answers: Map<String, String>,
     printerName: String?,
     paperSizeMm: Int = 58,
-    fontName: String = "Mangal",
+    fontName: String = "Roboto",
+    fontSize: Int = 24,
+    onConfigurePrint: () -> Unit,
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
     var isPrinting by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Mission Summary") }) }
+        topBar = { 
+            TopAppBar(
+                title = { Text("Final Submission") },
+                actions = {
+                    IconButton(onClick = onConfigurePrint) {
+                        Icon(Icons.Default.Settings, contentDescription = "Print Settings")
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -45,6 +58,7 @@ fun SurveyPreviewScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("Respondent: $respondentName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text("Contact: $respondentContact", style = MaterialTheme.typography.bodySmall)
+                            Text("Print Mode: $fontName • ${paperSizeMm}mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -72,20 +86,21 @@ fun SurveyPreviewScreen(
                             val result = PrintManager.printSurveyReceipt(
                                 context = context,
                                 printerName = printerName,
-                                surveyTitle = "Mission Record",
+                                surveyTitle = "SURVEYSETU RECORD",
                                 respondentName = respondentName,
                                 respondentContact = respondentContact,
                                 questions = questions,
                                 answers = answers,
                                 paperSizeMm = paperSizeMm,
-                                selectedFont = fontName
+                                selectedFont = fontName,
+                                fontSize = fontSize
                             )
                             isPrinting = false
                             if (result.isFailure) {
                                 Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                             }
                         } else {
-                            Toast.makeText(context, "Link a printer from the dashboard first", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please connect a printer from Dashboard", Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
@@ -99,7 +114,7 @@ fun SurveyPreviewScreen(
                     onClick = onFinish,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
-                    Text("Finish Shift")
+                    Text("Complete mission")
                 }
             }
         }

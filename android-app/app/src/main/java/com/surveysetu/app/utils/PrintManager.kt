@@ -15,11 +15,8 @@ import com.surveysetu.app.ui.QuestionUiModel
 object PrintManager {
 
     /**
-     * WORLD-CLASS PRINTING ENGINE:
-     * Supports Hindi/Unicode via Bitmap-to-Graphic conversion.
-     * Includes Premium Fonts:
-     * Hindi: Mangal, Kruti Dev (System), Kokila, Utsaah, Aparajita
-     * English: Roboto, Montserrat, OpenSans, Lato, Playfair
+     * WORLD-CLASS PRINTING ENGINE V2:
+     * Supports Hindi, English, and Bilingual modes with dynamic font scaling.
      */
     @SuppressLint("MissingPermission")
     fun printSurveyReceipt(
@@ -31,7 +28,8 @@ object PrintManager {
         questions: List<QuestionUiModel>,
         answers: Map<String, String>,
         paperSizeMm: Int = 58,
-        selectedFont: String = "Mangal"
+        selectedFont: String = "Roboto",
+        fontSize: Int = 24
     ): Result<Unit> {
         return try {
             val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
@@ -44,19 +42,17 @@ object PrintManager {
 
             val printer = EscPosPrinter(connection, 203, paperSizeMm.toFloat(), 32)
             
-            // 1. GENERATE THE RECEIPT IMAGE (To support Hindi/Unicode)
             val bitmap = generateReceiptBitmap(
-                context, 
-                surveyTitle, 
-                respondentName, 
-                respondentContact, 
-                questions, 
-                answers, 
-                paperSizeMm,
-                selectedFont
+                title = surveyTitle, 
+                name = respondentName, 
+                contact = respondentContact, 
+                questions = questions, 
+                answers = answers, 
+                widthMm = paperSizeMm,
+                fontName = selectedFont,
+                fontSize = fontSize.toFloat()
             )
 
-            // 2. CONVERT BITMAP TO ESC/POS GRAPHIC
             printer.printFormattedText(
                 "[C]<img>" + PrinterTextParserImg.bitmapToHexadecimalString(printer, bitmap) + "</img>\n\n\n"
             )
@@ -68,31 +64,30 @@ object PrintManager {
     }
 
     private fun generateReceiptBitmap(
-        context: Context,
         title: String,
         name: String,
         contact: String,
         questions: List<QuestionUiModel>,
         answers: Map<String, String>,
         widthMm: Int,
-        fontName: String
+        fontName: String,
+        fontSize: Float
     ): Bitmap {
-        val widthPx = if (widthMm == 80) 576 else 384 // DPI 203 calculation
+        val widthPx = if (widthMm == 80) 576 else 384
         val paint = TextPaint().apply {
             color = Color.BLACK
-            textSize = 24f
+            textSize = fontSize
             isAntiAlias = true
-            // Load requested font (fallback to System Default if asset missing)
             typeface = Typeface.create(fontName, Typeface.BOLD)
         }
 
-        // Pre-calculate height
         val content = StringBuilder()
         content.append("$title\n")
         content.append("--------------------------------\n")
         content.append("Respondent: $name\n")
         content.append("Contact: $contact\n")
         content.append("--------------------------------\n")
+
         questions.forEachIndexed { i, q ->
             val ans = q.options.find { it.id == answers[q.id] }?.text ?: "N/A"
             content.append("${i + 1}. ${q.text}\n")
