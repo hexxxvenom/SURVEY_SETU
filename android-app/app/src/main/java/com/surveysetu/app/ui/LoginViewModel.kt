@@ -2,6 +2,7 @@ package com.surveysetu.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.surveysetu.app.data.DatabaseProvider
 import com.surveysetu.app.data.LoginRequest
 import com.surveysetu.app.data.RetrofitClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,13 +37,17 @@ class LoginViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     
-                    // Save session and configure Retrofit
-                    com.surveysetu.app.data.DatabaseProvider.sessionManager.saveSession(body.token, deviceId)
+                    // Save real session data (Role, Name, Username)
+                    DatabaseProvider.sessionManager.saveSession(
+                        token = body.token, 
+                        role = body.role,
+                        name = body.name,
+                        username = body.username
+                    )
                     RetrofitClient.authToken = body.token
                     
                     _loginState.value = LoginState.Success(body.token, body.role)
                 } else {
-                    // Try to parse the error message if possible
                     val errorString = response.errorBody()?.string() ?: "Unknown error"
                     _loginState.value = LoginState.Error("Login failed: $errorString")
                 }

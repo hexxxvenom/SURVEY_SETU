@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.surveysetu.app.data.DatabaseProvider
 import com.surveysetu.app.data.SurveyEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +33,11 @@ fun DashboardScreen(
     val context = LocalContext.current
     val surveyState by viewModel.surveyState.collectAsState()
     
+    // FETCH REAL USER DATA FROM SESSION
+    val session = remember { DatabaseProvider.sessionManager }
+    val surveyorName = remember { session.getUserName() ?: "Unknown User" }
+    val surveyorId = remember { session.getUserId() ?: "ID: ---" }
+
     var showPrinterDialog by remember { mutableStateOf(false) }
     var selectedPrinterName by remember { mutableStateOf("No printer selected") }
 
@@ -56,7 +62,7 @@ fun DashboardScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // Surveyor Info Card
+            // Surveyor Info Card (NOW DYNAMIC)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -68,8 +74,8 @@ fun DashboardScreen(
                     Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(text = "Rahul Sharma", style = MaterialTheme.typography.titleLarge)
-                        Text(text = "ID: surveyor01", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = surveyorName, style = MaterialTheme.typography.titleLarge)
+                        Text(text = "User ID: $surveyorId", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -83,6 +89,7 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(text = "Available Surveys", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(8.dp))
 
             when (val state = surveyState) {
                 is SurveyState.Loading -> {
@@ -97,14 +104,17 @@ fun DashboardScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(state.message, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(16.dp))
                         Button(onClick = { viewModel.syncSurveys() }) {
-                            Text("Retry Sync")
+                            Text("Sync from Cloud")
                         }
                     }
                 }
                 is SurveyState.Success -> {
+                    // DISPLAY ALL SYNCED SURVEYS
+                    val surveys = remember { listOf(state.survey) } // For now showing the primary active one
                     LazyColumn {
-                        items(listOf(state.survey)) { survey ->
+                        items(surveys) { survey ->
                             Card(
                                 onClick = { onSurveySelected(survey) },
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -136,7 +146,6 @@ fun DashboardScreen(
 @SuppressLint("MissingPermission")
 @Composable
 fun PrinterPickerDialog(onDismiss: () -> Unit, onPrinterSelected: (String) -> Unit) {
-    val context = LocalContext.current
     val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     val pairedDevices: Set<BluetoothDevice> = bluetoothAdapter?.bondedDevices ?: emptySet()
 

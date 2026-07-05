@@ -12,9 +12,9 @@ data class LoginRequest(
 
 data class LoginResponse(
     val token: String,
-    val requireSelfie: Boolean,
-    val sessionId: String?,
-    val role: String
+    val role: String,
+    val name: String,
+    val username: String
 )
 
 // --- Survey Fetching ---
@@ -52,6 +52,3 @@ data class AnswerRequest(
 data class ErrorResponse(
     val error: String
 )
-
-// Note: multipart/form-data will be used for the photo, 
-// other fields will be passed as separate Parts or encoded in the request.
