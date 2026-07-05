@@ -2,7 +2,6 @@ package com.surveysetu.app.utils
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import android.content.Context
 import android.graphics.*
 import android.text.Layout
 import android.text.StaticLayout
@@ -17,9 +16,9 @@ import kotlinx.coroutines.withContext
 object PrintManager {
 
     /**
-     * ULTIMATE PRINTING ENGINE V5 (FORCE-MAX):
-     * Uses a massive 4.0x Power Multiplier to ensure text is physically large on paper.
-     * Implements High-Contrast rendering for Thermal Sensitivity.
+     * ULTIMATE THERMAL ENGINE V6 (PIXEL-PERFECT):
+     * Solves the "Shrinking Text" crisis by using NATIVE PRINTER PIXELS (1:1 Mapping).
+     * We no longer use large Android Spacing; we use physical printer dots.
      */
     @SuppressLint("MissingPermission")
     suspend fun printSurveyReceipt(
@@ -42,25 +41,34 @@ object PrintManager {
             val connection = BluetoothPrintersConnections().getList()?.find { it.getDevice().address == device.address }
                 ?: return@withContext Result.failure(Exception("Connection failed"))
 
-            // Force high-density output
+            // NATIVE PIXEL LOCK:
+            // 58mm = Exactly 384 dots
+            // 80mm = Exactly 576 dots
+            // 112mm = Exactly 832 dots
+            val nativeWidthDots = when (paperSizeMm) {
+                112 -> 832
+                80 -> 576
+                else -> 384
+            }
+
             val printer = EscPosPrinter(connection, 203, paperSizeMm.toFloat(), 32)
             
-            // POWER MULTIPLIER: 4x Increase to combat low-DPI thermal heads
-            val finalFontSize = fontSize.toFloat() * 4.0f
-
-            val bitmap = generateReceiptBitmap(
+            // RENDERING AT NATIVE RESOLUTION:
+            // This prevents the printer from scaling the image down!
+            val bitmap = generateNativeBitmap(
                 title = surveyTitle, 
                 name = respondentName, 
                 contact = respondentContact, 
                 questions = questions, 
                 answers = answers, 
-                widthMm = paperSizeMm,
+                widthDots = nativeWidthDots,
                 fontName = selectedFont,
-                fontSize = finalFontSize
+                fontSize = fontSize.toFloat() // We use the UI size directly as dots
             )
 
+            // Center print with NO scaling
             printer.printFormattedText(
-                "[C]<img>" + PrinterTextParserImg.bitmapToHexadecimalString(printer, bitmap) + "</img>\n\n\n"
+                "<img>" + PrinterTextParserImg.bitmapToHexadecimalString(printer, bitmap) + "</img>\n\n\n"
             )
 
             Result.success(Unit)
@@ -69,31 +77,22 @@ object PrintManager {
         }
     }
 
-    private fun generateReceiptBitmap(
+    private fun generateNativeBitmap(
         title: String,
         name: String,
         contact: String,
         questions: List<QuestionUiModel>,
         answers: Map<String, String>,
-        widthMm: Int,
+        widthDots: Int,
         fontName: String,
         fontSize: Float
     ): Bitmap {
-        // High-Resolution Canvas Targets
-        val widthPx = when (widthMm) {
-            112 -> 864
-            80 -> 576
-            else -> 384
-        }
-        
         val paint = TextPaint().apply {
             color = Color.BLACK
-            textSize = fontSize
-            isAntiAlias = true
+            textSize = fontSize // Direct pixel mapping
+            isAntiAlias = false // Crisp dots for thermal heads
             typeface = Typeface.create(fontName, Typeface.BOLD)
-            // Enhanced darkness for thermal paper
-            strokeWidth = 2f
-            style = Paint.Style.FILL_AND_STROKE
+            style = Paint.Style.FILL
         }
 
         val content = StringBuilder()
@@ -109,15 +108,14 @@ object PrintManager {
             content.append("ANS: $ans\n\n")
         }
 
-        val staticLayout = StaticLayout.Builder.obtain(content.toString(), 0, content.length, paint, widthPx)
+        val staticLayout = StaticLayout.Builder.obtain(content.toString(), 0, content.length, paint, widthDots)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-            .setLineSpacing(0f, 1.1f)
+            .setLineSpacing(0f, 1.0f)
             .build()
 
-        val bitmap = Bitmap.createBitmap(widthPx, staticLayout.height + 100, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(widthDots, staticLayout.height + 20, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
-        canvas.translate(0f, 50f)
         staticLayout.draw(canvas)
 
         return bitmap
