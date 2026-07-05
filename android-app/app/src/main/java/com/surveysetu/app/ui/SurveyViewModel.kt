@@ -125,31 +125,26 @@ class SurveyViewModel(
         answers: Map<String, String>, 
         respondentName: String,
         respondentContact: String,
-        onComplete: () -> Unit
+        lat: Double?,
+        lng: Double?,
+        onComplete: (Result<Unit>) -> Unit
     ) {
         _isSubmitting.value = true
         viewModelScope.launch {
             val answerList = answers.map { AnswerUiModel(it.key, it.value) }
-            
-            // 1. Force upload to cloud immediately with Real-Time HW and User Context
             val hwId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext()
             
+            // 1. Force upload to cloud immediately with REAL GPS
             val result = repository.uploadResponse(
                 surveyId = survey.id,
                 version = survey.version,
                 deviceId = hwId,
-                lat = null, 
-                lng = null,
+                lat = lat, 
+                lng = lng,
                 name = respondentName,
                 contact = respondentContact,
                 answers = answerList
             )
-            
-            if (result.isSuccess) {
-                Log.i("SurveyViewModel", "Response successfully synced to Cloud")
-            } else {
-                Log.e("SurveyViewModel", "Cloud Sync Failed: ${result.exceptionOrNull()?.message}")
-            }
             
             // 2. Local backup
             repository.saveResponseLocally(
@@ -157,14 +152,14 @@ class SurveyViewModel(
                 version = survey.version,
                 deviceId = hwId, 
                 surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "---",
-                lat = null,
-                lng = null,
+                lat = lat,
+                lng = lng,
                 photoPath = null,
                 answers = answerList
             )
-
+            
             _isSubmitting.value = false
-            onComplete()
+            onComplete(result)
         }
     }
 }

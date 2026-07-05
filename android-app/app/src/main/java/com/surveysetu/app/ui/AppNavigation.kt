@@ -77,6 +77,7 @@ fun AppNavigation() {
         
         composable("preview") {
             SurveyPreviewScreen(
+                survey = selectedSurvey,
                 respondentName = respondentName,
                 respondentContact = respondentContact,
                 questions = surveyQuestions, 
@@ -97,7 +98,6 @@ fun AppNavigation() {
         }
 
         composable("print_wizard") {
-            // MANUAL LANGUAGE OPTION RESTORED
             PrintSettingsScreen(
                 currentPaperSize = paperSize,
                 currentFontName = selectedFontName,

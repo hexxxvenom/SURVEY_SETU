@@ -1,5 +1,6 @@
 package com.surveysetu.app.ui
 
+import android.annotation.SuppressLint
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,12 +14,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.surveysetu.app.data.SurveyEntity
 import com.surveysetu.app.utils.PrintManager
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SurveyPreviewScreen(
+    survey: SurveyEntity?,
     respondentName: String,
     respondentContact: String,
     questions: List<QuestionUiModel>,
@@ -27,12 +33,15 @@ fun SurveyPreviewScreen(
     paperSizeMm: Int = 58,
     fontName: String = "Roboto",
     fontSize: Int = 24,
+    viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
     onConfigurePrint: () -> Unit,
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isPrinting by remember { mutableStateOf(false) }
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     Scaffold(
         topBar = { 
@@ -61,7 +70,7 @@ fun SurveyPreviewScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("Respondent: $respondentName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text("Contact: $respondentContact", style = MaterialTheme.typography.bodySmall)
-                            Text("Print Mode: $fontName • ${paperSizeMm}mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Mode: $fontName • ${paperSizeMm}mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -87,10 +96,9 @@ fun SurveyPreviewScreen(
                         if (printerName != null) {
                             isPrinting = true
                             scope.launch {
-                                // ASYNC PRINT: Prevents UI Glitch
                                 val result = PrintManager.printSurveyReceipt(
                                     printerName = printerName,
-                                    surveyTitle = "SURVEYSETU RECORD",
+                                    surveyTitle = survey?.title ?: "SURVEYSETU",
                                     respondentName = respondentName,
                                     respondentContact = respondentContact,
                                     questions = questions,
@@ -102,27 +110,49 @@ fun SurveyPreviewScreen(
                                 isPrinting = false
                                 if (result.isFailure) {
                                     Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(context, "Receipt Sent Successfully!", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         } else {
-                            Toast.makeText(context, "Please connect a printer from Dashboard", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Connect printer from Dashboard", Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                    enabled = !isPrinting
+                    enabled = !isPrinting && !isSubmitting
                 ) {
                     if (isPrinting) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    else Text("Print Receipt")
+                    else Text("Print")
                 }
                 
                 Button(
-                    onClick = onFinish,
-                    modifier = Modifier.weight(1f).height(56.dp)
+                    onClick = {
+                        if (survey == null) return@Button
+                        
+                        // Capture real-time GPS for response submission
+                        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                            viewModel.submitSurvey(
+                                survey = survey,
+                                answers = answers,
+                                respondentName = respondentName,
+                                respondentContact = respondentContact,
+                                lat = location?.latitude,
+                                lng = location?.longitude,
+                                onComplete = { result ->
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "Success: Data Sent to CMS!", Toast.LENGTH_SHORT).show()
+                                        onFinish()
+                                    } else {
+                                        Toast.makeText(context, "Sync Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    enabled = !isSubmitting && !isPrinting
                 ) {
-                    Text("Complete mission")
+                    if (isSubmitting) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    else Text("Finish Mission")
                 }
             }
         }

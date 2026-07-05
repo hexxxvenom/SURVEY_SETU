@@ -47,12 +47,10 @@ class SurveyRepository(
 
     suspend fun syncActiveSurveys(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.d("SurveyRepository", "Syncing surveys from cloud...")
             val response = apiService.getActiveSurveys()
             if (response.isSuccessful) {
                 val surveys = response.body() ?: return@withContext Result.failure(Exception("Cloud returned empty data"))
                 
-                // Nuclear Sync: Wipe old
                 surveyDao.clearAllOptions()
                 surveyDao.clearAllQuestions()
                 surveyDao.clearAllSurveys()
@@ -100,7 +98,7 @@ class SurveyRepository(
         }
     }
 
-    // REAL-TIME CLOUD SUBMISSION ENGINE
+    // UPDATED: High-Fidelity Cloud Submission
     suspend fun uploadResponse(
         surveyId: String,
         version: Int,
@@ -120,21 +118,29 @@ class SurveyRepository(
             val namePart = name.toRequestBody("text/plain".toMediaTypeOrNull())
             val contactPart = contact.toRequestBody("text/plain".toMediaTypeOrNull())
             
-            // Format answers as required by backend
+            // Format answers as STRING for Multer parsing
             val answerRequests = answers.map { 
                 mapOf("question_id" to it.questionId, "selected_option_id" to it.selectedOptionId)
             }
-            val answersJson = Gson().toJson(answerRequests).toRequestBody("application/json".toMediaTypeOrNull())
+            val answersJsonString = Gson().toJson(answerRequests)
+            val answersPart = answersJsonString.toRequestBody("text/plain".toMediaTypeOrNull())
 
             val response = apiService.submitResponse(
                 surveyIdPart, versionPart, deviceIdPart, 
                 latPart, lngPart, namePart, contactPart, 
-                answersJson, null
+                answersPart, null
             )
 
-            if (response.isSuccessful) Result.success(Unit)
-            else Result.failure(Exception("Cloud rejection: ${response.code()}"))
+            if (response.isSuccessful) {
+                Log.i("SurveyRepository", "Cloud Submission SUCCESS: ${response.body()}")
+                Result.success(Unit)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown Cloud Error"
+                Log.e("SurveyRepository", "Cloud Submission REJECTED: $errorBody")
+                Result.failure(Exception(errorBody))
+            }
         } catch (e: Exception) {
+            Log.e("SurveyRepository", "Cloud Submission FAILED", e)
             Result.failure(e)
         }
     }
