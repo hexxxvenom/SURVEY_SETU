@@ -36,7 +36,7 @@ class SurveyViewModel(
             try {
                 // REAL-TIME SECURITY LOCK: Force check cloud status
                 val me = RetrofitClient.apiService.getMe()
-                if (me.code() == 401 || me.code() == 403 || me.body()?.status == "LOCKED") {
+                if (me.code() == 401 || me.code() == 403 || (me.isSuccessful && me.body()?.status == "LOCKED")) {
                     _surveyState.value = SurveyState.Error("ACCOUNT_LOCKED")
                     return@launch
                 }
@@ -60,10 +60,20 @@ class SurveyViewModel(
                     _surveyState.value = SurveyState.Error("No active survey found. Click Sync.")
                 }
             } catch (e: Exception) {
-                // Fallback to local if totally offline, but local load is only allowed if already synced
+                // Fallback to local if totally offline
                 val local = surveyDao.getActiveSurvey()
                 if (local != null) {
-                    loadLocalSurvey(false)
+                    val questions = surveyDao.getQuestionsForSurvey(local.id)
+                    val uiQuestions = questions.map { q ->
+                        val options = surveyDao.getOptionsForQuestion(q.id)
+                        QuestionUiModel(
+                            id = q.id,
+                            text = q.questionText,
+                            isMandatory = q.isMandatory,
+                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                        )
+                    }
+                    _surveyState.value = SurveyState.Success(local, uiQuestions)
                 } else {
                     _surveyState.value = SurveyState.Error("Cloud connection required for first shift.")
                 }
@@ -96,7 +106,7 @@ class SurveyViewModel(
             repository.saveResponseLocally(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = "HW_DETECTION_ACTIVE", 
+                deviceId = "HW_AUTODETECT",
                 surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "UNKNOWN",
                 lat = null,
                 lng = null,

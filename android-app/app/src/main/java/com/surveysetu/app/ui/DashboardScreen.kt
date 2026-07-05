@@ -31,7 +31,8 @@ import com.surveysetu.app.data.SurveyEntity
 fun DashboardScreen(
     viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
     onSurveySelected: (SurveyEntity) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onPrinterStatusChanged: (String?) -> Unit
 ) {
     val context = LocalContext.current
     val surveyState by viewModel.surveyState.collectAsState()
@@ -41,7 +42,7 @@ fun DashboardScreen(
     val surveyorId = remember { session.getUserId() ?: "---" }
 
     var showPrinterDialog by remember { mutableStateOf(false) }
-    var selectedPrinterName by remember { mutableStateOf("No printer selected") }
+    var selectedPrinterName by remember { mutableStateOf<String?>(null) }
 
     // REAL-TIME LOCK CHECK
     LaunchedEffect(surveyState) {
@@ -56,7 +57,7 @@ fun DashboardScreen(
                 title = { Text("Surveyor Dashboard") },
                 actions = {
                     IconButton(onClick = { showPrinterDialog = true }) {
-                        Icon(Icons.Default.Print, contentDescription = "Connect Printer", tint = if (selectedPrinterName.contains("No")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Print, contentDescription = "Connect Printer", tint = if (selectedPrinterName == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = { viewModel.syncSurveys() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Sync")
@@ -92,7 +93,7 @@ fun DashboardScreen(
             }
 
             Text(
-                text = selectedPrinterName,
+                text = selectedPrinterName ?: "No printer selected",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(top = 8.dp)
@@ -147,7 +148,8 @@ fun DashboardScreen(
         PrinterPickerDialog(
             onDismiss = { showPrinterDialog = false },
             onPrinterSelected = { 
-                selectedPrinterName = "Printer Ready: $it"
+                selectedPrinterName = it
+                onPrinterStatusChanged(it)
                 showPrinterDialog = false 
             }
         )

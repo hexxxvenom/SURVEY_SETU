@@ -15,6 +15,7 @@ fun AppNavigation() {
     var respondentName by remember { mutableStateOf("") }
     var respondentContact by remember { mutableStateOf("") }
     var surveyAnswers by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var connectedPrinterName by remember { mutableStateOf<String?>(null) }
 
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
@@ -40,7 +41,8 @@ fun AppNavigation() {
                     navController.navigate("login") {
                         popUpTo(0)
                     }
-                }
+                },
+                onPrinterStatusChanged = { connectedPrinterName = it }
             )
         }
         
@@ -68,20 +70,10 @@ fun AppNavigation() {
             SurveyPreviewScreen(
                 respondentName = respondentName,
                 respondentContact = respondentContact,
-                questions = emptyList(), // Needs fetch logic
+                questions = emptyList(),
                 answers = surveyAnswers,
-                onPrintRequested = { navController.navigate("print_settings") },
+                printerName = connectedPrinterName,
                 onFinish = {
-                    navController.navigate("dashboard") {
-                        popUpTo("dashboard") { inclusive = true }
-                    }
-                }
-            )
-        }
-        
-        composable("print_settings") {
-            PrintSettingsScreen(
-                onPrint = { _, _ ->
                     navController.navigate("dashboard") {
                         popUpTo("dashboard") { inclusive = true }
                     }

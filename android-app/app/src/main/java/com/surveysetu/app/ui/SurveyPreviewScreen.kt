@@ -1,12 +1,16 @@
 package com.surveysetu.app.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.surveysetu.app.utils.PrintManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -15,11 +19,14 @@ fun SurveyPreviewScreen(
     respondentContact: String,
     questions: List<QuestionUiModel>,
     answers: Map<String, String>,
-    onPrintRequested: () -> Unit,
+    printerName: String?,
     onFinish: () -> Unit
 ) {
+    val context = LocalContext.current
+    var isPrinting by remember { mutableStateOf(false) }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Response Preview") }) }
+        topBar = { TopAppBar(title = { Text("Final Confirmation") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -29,18 +36,25 @@ fun SurveyPreviewScreen(
         ) {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 item {
-                    Text("Respondent: $respondentName", style = MaterialTheme.typography.titleLarge)
-                    Text("Contact: $respondentContact", style = MaterialTheme.typography.bodyMedium)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Respondent: $respondentName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Contact: $respondentContact", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
 
-                items(questions) { question ->
+                itemsIndexed(questions) { index, question ->
                     val selectedOptionId = answers[question.id]
                     val selectedOptionText = question.options.find { it.id == selectedOptionId }?.text ?: "Not Answered"
                     
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Text(text = question.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text(text = "${index + 1}. ${question.text}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         Text(text = selectedOptionText, style = MaterialTheme.typography.bodyLarge)
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp), thickness = 0.5.dp)
                     }
                 }
             }
@@ -49,17 +63,38 @@ fun SurveyPreviewScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedButton(
+                Button(
+                    onClick = {
+                        if (printerName != null) {
+                            isPrinting = true
+                            val result = PrintManager.printSurveyReceipt(
+                                printerName = printerName,
+                                surveyTitle = "Demographic Survey",
+                                respondentName = respondentName,
+                                respondentContact = respondentContact,
+                                questions = questions,
+                                answers = answers
+                            )
+                            isPrinting = false
+                            if (result.isFailure) {
+                                Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "Please connect a printer from Dashboard", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                    enabled = !isPrinting
+                ) {
+                    Text("Print Receipt")
+                }
+                
+                Button(
                     onClick = onFinish,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
-                    Text("Finish Without Print")
-                }
-                Button(
-                    onClick = onPrintRequested,
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("Print Receipt")
+                    Text("Finish Mission")
                 }
             }
         }
