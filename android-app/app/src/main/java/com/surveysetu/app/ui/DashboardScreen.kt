@@ -140,6 +140,12 @@ fun DashboardScreen(
                         }
                     }
                 }
+                else -> {
+                    // Fallback for SingleSuccess or other future states on the dashboard
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
             }
         }
     }

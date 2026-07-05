@@ -59,7 +59,10 @@ fun AppNavigation() {
         }
         
         composable("survey_questions") {
+            // FIXED: Use the ID of the survey selected on the dashboard
+            val surveyId = selectedSurvey?.id ?: ""
             SurveyScreen(
+                surveyId = surveyId,
                 onFinish = { answers, questions ->
                     surveyAnswers = answers
                     surveyQuestions = questions

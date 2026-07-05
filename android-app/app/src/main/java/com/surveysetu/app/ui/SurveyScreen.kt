@@ -15,11 +15,17 @@ data class AnswerUiModel(val questionId: String, val selectedOptionId: String)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SurveyScreen(
+    surveyId: String,
     viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
     onFinish: (Map<String, String>, List<QuestionUiModel>) -> Unit
 ) {
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
+
+    // Load the specific survey on launch
+    LaunchedEffect(surveyId) {
+        viewModel.loadSingleSurvey(surveyId)
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -36,28 +42,26 @@ fun SurveyScreen(
                     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                         Text(state.message, color = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.syncSurveys() }) {
-                            Text("Retry Sync")
+                        Button(onClick = { viewModel.loadSingleSurvey(surveyId) }) {
+                            Text("Retry Load")
                         }
                     }
                 }
             }
+            is SurveyState.SingleSuccess -> {
+                SurveyContent(
+                    survey = state.survey,
+                    questions = state.questions,
+                    isSubmitting = isSubmitting,
+                    onSubmit = { answers ->
+                        onFinish(answers, state.questions)
+                    }
+                )
+            }
             is SurveyState.Success -> {
-                // IMPORTANT: In the new multi-survey mode, we need to know WHICH survey to show.
-                // For this demo, we assume there's at least one.
-                val data = state.surveys.firstOrNull()
-                if (data != null) {
-                    SurveyContent(
-                        survey = data.survey,
-                        questions = data.questions,
-                        isSubmitting = isSubmitting,
-                        onSubmit = { answers ->
-                            onFinish(answers, data.questions)
-                        }
-                    )
-                } else {
-                    Text("No questions found in this survey.")
-                }
+                // If we are in multi-view but need single, the LaunchedEffect will handle it.
+                // Show loading while waiting for the SingleSuccess transition.
+                CircularProgressIndicator()
             }
         }
     }

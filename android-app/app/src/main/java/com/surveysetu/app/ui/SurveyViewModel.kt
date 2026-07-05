@@ -12,6 +12,7 @@ import android.util.Log
 sealed class SurveyState {
     object Loading : SurveyState()
     data class Success(val surveys: List<SurveyWithQuestions>) : SurveyState()
+    data class SingleSuccess(val survey: SurveyEntity, val questions: List<QuestionUiModel>) : SurveyState()
     data class Error(val message: String) : SurveyState()
 }
 
@@ -64,6 +65,7 @@ class SurveyViewModel(
                     _surveyState.value = SurveyState.Success(surveysWithQuestions)
                     Log.d("SurveyViewModel", "Loaded ${surveysWithQuestions.size} surveys from local DB")
                 } else if (triggerSyncIfEmpty) {
+                    Log.i("SurveyViewModel", "Local DB empty. Triggering automatic cloud sync...")
                     syncSurveys()
                 } else {
                     _surveyState.value = SurveyState.Error("No active survey found. Click Sync.")
@@ -94,14 +96,44 @@ class SurveyViewModel(
         }
     }
 
+    fun loadSingleSurvey(surveyId: String) {
+        _surveyState.value = SurveyState.Loading
+        viewModelScope.launch {
+            try {
+                val survey = surveyDao.getAllActiveSurveys().find { it.id == surveyId }
+                if (survey != null) {
+                    val questions = surveyDao.getQuestionsForSurvey(survey.id)
+                    val uiQuestions = questions.map { q ->
+                        val options = surveyDao.getOptionsForQuestion(q.id)
+                        QuestionUiModel(
+                            id = q.id,
+                            text = q.questionText,
+                            isMandatory = q.isMandatory,
+                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                        )
+                    }
+                    _surveyState.value = SurveyState.SingleSuccess(survey, uiQuestions)
+                } else {
+                    _surveyState.value = SurveyState.Error("Survey not found locally.")
+                }
+            } catch (e: Exception) {
+                _surveyState.value = SurveyState.Error("Error loading survey details.")
+            }
+        }
+    }
+
     fun syncSurveys() {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
+            Log.i("SurveyViewModel", "Starting Cloud Sync...")
             val result = repository.syncActiveSurveys()
             if (result.isSuccess) {
+                Log.i("SurveyViewModel", "Sync Successful. Reloading local data.")
                 loadLocalSurveys(triggerSyncIfEmpty = false)
             } else {
-                _surveyState.value = SurveyState.Error("Sync failed. Check cloud connection.")
+                val error = result.exceptionOrNull()?.message ?: "Unknown Sync Error"
+                Log.e("SurveyViewModel", "Sync Failed: $error")
+                _surveyState.value = SurveyState.Error("Sync failed: $error")
             }
         }
     }
