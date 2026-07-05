@@ -2,22 +2,18 @@ import { Router } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import prisma from '../prisma';
 import multer from 'multer';
-import path from 'path';
 
 const router = Router();
-
-const upload = multer({
-  dest: 'uploads/',
-  limits: { fileSize: 5 * 1024 * 1024 }
-});
+const upload = multer({ dest: 'uploads/' });
 
 router.use(authenticate);
 
+// ULTIMATE RESPONSE SUBMISSION ENGINE
 router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res) => {
   const {
     survey_id,
     survey_version,
-    device_id,
+    device_id, // This is the physical Hardware ID (e.g. 8fc5...)
     gps_lat,
     gps_lng,
     answers,
@@ -26,43 +22,34 @@ router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res
   } = req.body;
   const surveyor_id = req.user!.id;
 
-  console.log(`[RESPONSE] Incoming: Survey ${survey_id}, User: ${surveyor_id}, Device: ${device_id}`);
-
-  if (!survey_id || !survey_version || !device_id) {
-    console.error("[RESPONSE ERROR] Missing Core Headers");
-    return res.status(400).json({ error: 'survey_id, survey_version, and device_id are required' });
-  }
-
-  // Find the internal DB ID for the hardware
-  const device = await prisma.device.findUnique({
-      where: { device_identifier: device_id }
-  });
-
-  if (!device) {
-      console.error(`[RESPONSE ERROR] Hardware ${device_id} not authorized in CMS`);
-      return res.status(404).json({ error: "Unauthorized hardware ID" });
-  }
-
-  let parsedAnswers: any[];
-  try {
-    parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers;
-  } catch (_parseErr) {
-    console.error("[RESPONSE ERROR] malformed JSON answers");
-    return res.status(400).json({ error: 'Invalid answers format' });
-  }
+  console.log(`[CLOUD-SYNC] Incoming Response from User: ${surveyor_id} on Device: ${device_id}`);
 
   try {
+    // 1. DYNAMIC HARDWARE LOOKUP
+    // The app sends the physical ID, but the DB needs the internal UUID
+    const deviceRecord = await prisma.device.findUnique({
+        where: { device_identifier: device_id }
+    });
+
+    if (!deviceRecord) {
+        console.error(`[SYNC ERROR] Device ${device_id} is not registered in CMS!`);
+        return res.status(404).json({ error: "Device not authorized in registry" });
+    }
+
+    // 2. DATA PARSING
+    const parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers;
+
+    // 3. ATOMIC DATABASE COMMIT
     const response = await prisma.response.create({
         data: {
           survey_id,
           survey_version: parseInt(survey_version.toString()),
-          device_id: device.id, // Use internal UUID
+          device_id: deviceRecord.id, // Linked via internal UUID
           surveyor_id,
-          respondent_name: respondent_name || "N/A",
+          respondent_name: respondent_name || "Anonymous",
           respondent_contact: respondent_contact || "N/A",
           gps_lat: gps_lat ? parseFloat(gps_lat.toString()) : null,
           gps_lng: gps_lng ? parseFloat(gps_lng.toString()) : null,
-          respondent_photo_url: req.file ? `/uploads/${req.file.filename}` : null,
           answers: {
             create: parsedAnswers.map((a: any) => ({
               question_id: a.question_id,
@@ -72,28 +59,25 @@ router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res
         }
       });
 
-      console.log(`[RESPONSE SUCCESS] Saved: ${response.id}`);
-      res.status(201).json(response);
+      console.log(`[SYNC SUCCESS] Entry ${response.id} is now LIVE in CMS`);
+      res.status(201).json({ success: true, id: response.id });
   } catch (err: any) {
-      console.error("[RESPONSE DATABASE ERROR]", err);
-      res.status(500).json({ error: err.message });
+      console.error("[CRITICAL DB ERROR]", err);
+      res.status(500).json({ error: "Cloud storage failed. Verify database connectivity." });
   }
 });
 
 router.get('/history', async (req: AuthRequest, res) => {
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
-  const skip = (page - 1) * pageSize;
-
-  const history = await prisma.response.findMany({
-      where: { surveyor_id: req.user!.id },
-      include: { survey: { select: { title: true } } },
-      take: pageSize,
-      skip,
-      orderBy: { submitted_at: 'desc' }
-  });
-
-  res.json({ data: history });
+  try {
+    const history = await prisma.response.findMany({
+        where: { surveyor_id: req.user!.id },
+        include: { survey: { select: { title: true } } },
+        orderBy: { submitted_at: 'desc' }
+    });
+    res.json({ data: history });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
 });
 
 export default router;
