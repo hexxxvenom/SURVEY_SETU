@@ -56,13 +56,14 @@ router.post('/users', async (req: AuthRequest, res) => {
 
 router.put('/users/:id', async (req: AuthRequest, res) => {
     const { name, role, linked_device_id, password } = req.body;
+    const userId = req.params.id as string;
     try {
         const updateData: any = { name, role, linked_device_id: linked_device_id || null };
         if (password) {
             updateData.password_hash = await bcrypt.hash(password, 10);
         }
         const user = await prisma.user.update({
-            where: { id: req.params.id },
+            where: { id: userId },
             data: updateData
         });
         res.json(user);
@@ -71,9 +72,8 @@ router.put('/users/:id', async (req: AuthRequest, res) => {
     }
 });
 
-// SAFE CASCADE DELETE: Delete everything linked to this user first
 router.delete('/users/:id', async (req: AuthRequest, res) => {
-    const userId = req.params.id;
+    const userId = req.params.id as string;
     try {
         const userToDelete = await prisma.user.findUnique({ where: { id: userId } });
         if (userToDelete?.username === 'superadmin') return res.status(403).json({ error: "Cannot delete Root Admin" });
@@ -94,10 +94,11 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
 });
 
 router.patch('/users/:id/status', async (req: AuthRequest, res) => {
+  const userId = req.params.id as string;
   const { status } = req.body;
   try {
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: userId },
       data: { status }
     });
     res.json(user);
@@ -136,10 +137,11 @@ router.post('/devices', async (req: AuthRequest, res) => {
 });
 
 router.put('/devices/:id', async (req: AuthRequest, res) => {
+    const deviceId = req.params.id as string;
     const { device_identifier, device_name } = req.body;
     try {
         const device = await prisma.device.update({
-            where: { id: req.params.id },
+            where: { id: deviceId },
             data: { device_identifier, device_name }
         });
         res.json(device);
@@ -149,8 +151,9 @@ router.put('/devices/:id', async (req: AuthRequest, res) => {
 });
 
 router.delete('/devices/:id', async (req: AuthRequest, res) => {
+    const deviceId = req.params.id as string;
     try {
-        await prisma.device.delete({ where: { id: req.params.id } });
+        await prisma.device.delete({ where: { id: deviceId } });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -158,10 +161,11 @@ router.delete('/devices/:id', async (req: AuthRequest, res) => {
 });
 
 router.patch('/devices/:id/status', async (req: AuthRequest, res) => {
+  const deviceId = req.params.id as string;
   const { status } = req.body;
   try {
     const device = await prisma.device.update({
-      where: { id: req.params.id },
+      where: { id: deviceId },
       data: { status }
     });
     res.json(device);
