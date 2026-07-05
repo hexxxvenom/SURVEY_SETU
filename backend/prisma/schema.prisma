@@ -169,6 +169,8 @@ model LoginSession {
   user_id              String
   device_id            String
   selfie_photo_url     String?
+  gps_lat              Float?         // Added for attendance tracking
+  gps_lng              Float?         // Added for attendance tracking
   login_timestamp      DateTime       @default(now())
   logout_timestamp     DateTime?
   
@@ -180,6 +182,7 @@ model LoginSession {
   updatedAt            DateTime       @updatedAt
 
   @@index([user_id])
+  @@index([login_timestamp])
 }
 
 model AuditLog {

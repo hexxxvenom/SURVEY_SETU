@@ -27,9 +27,14 @@ export const Layout = () => {
             <LayoutDashboard size={20} className="text-saffron" /> Dashboard
           </Link>
           {(role === 'SUPER_ADMIN' || role === 'ADMIN') && (
-            <Link to="/responses" className={linkClass('/responses')}>
-              <FileText size={20} className="text-saffron" /> Responses
-            </Link>
+            <>
+              <Link to="/attendance" className={linkClass('/attendance')}>
+                <Clock size={20} className="text-saffron" /> Attendance
+              </Link>
+              <Link to="/responses" className={linkClass('/responses')}>
+                <FileText size={20} className="text-saffron" /> Responses
+              </Link>
+            </>
           )}
           {(role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'EDITOR') && (
             <Link to="/surveys" className={linkClass('/surveys')}>

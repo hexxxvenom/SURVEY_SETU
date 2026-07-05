@@ -166,6 +166,20 @@ router.patch('/devices/:id/status', async (req: AuthRequest, res) => {
   }
 });
 
+// --- Attendance Management ---
+
+router.get('/attendance', async (req: AuthRequest, res) => {
+    try {
+        const attendance = await prisma.loginSession.findMany({
+            include: { user: { select: { name: true, username: true } }, device: { select: { device_identifier: true } } },
+            orderBy: { login_timestamp: 'desc' }
+        });
+        res.json({ data: attendance });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- Response Management ---
 
 router.get('/responses', async (req: AuthRequest, res) => {

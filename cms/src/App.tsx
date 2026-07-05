@@ -8,6 +8,7 @@ import { Users } from './pages/Users';
 import { Devices } from './pages/Devices';
 import { Responses } from './pages/Responses';
 import { Settings } from './pages/Settings';
+import { Attendance } from './pages/Attendance';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
+          <Route path="attendance" element={<Attendance />} />
           <Route path="responses" element={<Responses />} />
           <Route path="surveys" element={<Surveys />} />
           <Route path="surveys/new" element={<SurveyEditor />} />
