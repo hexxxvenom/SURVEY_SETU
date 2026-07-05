@@ -1,6 +1,6 @@
 package com.surveysetu.app.ui
 
-import android.net.Uri
+import android.annotation.SuppressLint
 import android.provider.Settings
 import android.util.Log
 import androidx.camera.core.CameraSelector
@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
 
+@SuppressLint("MissingPermission")
 @Composable
 fun SelfieScreen(
     onClockInSuccess: () -> Unit,
@@ -34,6 +34,7 @@ fun SelfieScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -52,12 +53,6 @@ fun SelfieScreen(
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(16.dp)
         )
-        Text(
-            text = "Capture a selfie to verify your identity and start your field shift",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
 
         if (isVerifying) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp))
@@ -67,11 +62,7 @@ fun SelfieScreen(
             Text(text = it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
         }
 
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
@@ -103,42 +94,46 @@ fun SelfieScreen(
                 isVerifying = true
                 errorMessage = null
 
-                val photoFile = File(context.cacheDir, "clock_in_${System.currentTimeMillis()}.jpg")
-                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                // 1. Capture Location FIRST to ensure no NULL data
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    val lat = location?.latitude
+                    val lng = location?.longitude
 
-                capture.takePicture(
-                    outputOptions,
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            scope.launch {
-                                // Trigger real-time attendance clock-in on the cloud
-                                val result = viewModel.repository.clockIn(hardwareId, null, null, photoFile)
-                                if (result.isSuccess) {
-                                    onClockInSuccess()
-                                } else {
-                                    isVerifying = false
-                                    errorMessage = "Clock-in Failed: ${result.exceptionOrNull()?.message}"
+                    // 2. Capture Selfie
+                    val photoFile = File(context.cacheDir, "clock_in_${System.currentTimeMillis()}.jpg")
+                    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+                    capture.takePicture(
+                        outputOptions,
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                scope.launch {
+                                    // 3. Submit everything to cloud
+                                    val result = viewModel.repository.clockIn(hardwareId, lat, lng, photoFile)
+                                    if (result.isSuccess) {
+                                        onClockInSuccess()
+                                    } else {
+                                        isVerifying = false
+                                        errorMessage = "Sync Error: ${result.exceptionOrNull()?.message}"
+                                    }
                                 }
                             }
+                            override fun onError(exc: ImageCaptureException) {
+                                isVerifying = false
+                                errorMessage = "Capture Failed: ${exc.message}"
+                            }
                         }
-                        override fun onError(exc: ImageCaptureException) {
-                            isVerifying = false
-                            errorMessage = "Capture Failed: ${exc.message}"
-                        }
-                    }
-                )
+                    )
+                }.addOnFailureListener { 
+                    isVerifying = false
+                    errorMessage = "GPS Error: Please enable location"
+                }
             },
             modifier = Modifier.padding(32.dp).fillMaxWidth().height(56.dp),
             enabled = !isVerifying
         ) {
-            if (isVerifying) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Verifying Identity...")
-            } else {
-                Text("Verify & Start Shift")
-            }
+            Text(if (isVerifying) "Syncing with Cloud..." else "Verify & Start Shift")
         }
     }
 }

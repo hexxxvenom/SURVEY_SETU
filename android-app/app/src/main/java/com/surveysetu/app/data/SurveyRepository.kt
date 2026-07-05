@@ -9,6 +9,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import android.util.Log
+import com.google.gson.Gson
 
 class SurveyRepository(
     private val apiService: ApiService,
@@ -51,26 +52,21 @@ class SurveyRepository(
             if (response.isSuccessful) {
                 val surveys = response.body() ?: return@withContext Result.failure(Exception("Cloud returned empty data"))
                 
-                Log.d("SurveyRepository", "Found ${surveys.size} surveys to sync")
-                
                 // Nuclear Sync: Wipe old
                 surveyDao.clearAllOptions()
                 surveyDao.clearAllQuestions()
                 surveyDao.clearAllSurveys()
                 
                 surveys.forEach { surveyDto ->
-                    Log.d("SurveyRepository", "Processing: ${surveyDto.title} (${surveyDto.language})")
-                    
                     surveyDao.insertSurvey(
                         SurveyEntity(
                             id = surveyDto.id,
                             title = surveyDto.title,
                             version = surveyDto.version,
                             isPublished = true,
-                            language = surveyDto.language // Store the language for auto-detection
+                            language = surveyDto.language
                         )
                     )
-                    
                     val questions = surveyDto.questions.map { q ->
                         QuestionEntity(
                             id = q.id,
@@ -95,13 +91,50 @@ class SurveyRepository(
                         surveyDao.insertOptions(options)
                     }
                 }
-                
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("API Error: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e("SurveyRepository", "CRITICAL SYNC FAILURE", e)
+            Result.failure(e)
+        }
+    }
+
+    // REAL-TIME CLOUD SUBMISSION ENGINE
+    suspend fun uploadResponse(
+        surveyId: String,
+        version: Int,
+        deviceId: String,
+        lat: Double?,
+        lng: Double?,
+        name: String,
+        contact: String,
+        answers: List<AnswerUiModel>
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val surveyIdPart = surveyId.toRequestBody("text/plain".toMediaTypeOrNull())
+            val versionPart = version.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+            val deviceIdPart = deviceId.toRequestBody("text/plain".toMediaTypeOrNull())
+            val latPart = lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+            val lngPart = lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+            val namePart = name.toRequestBody("text/plain".toMediaTypeOrNull())
+            val contactPart = contact.toRequestBody("text/plain".toMediaTypeOrNull())
+            
+            // Format answers as required by backend
+            val answerRequests = answers.map { 
+                mapOf("question_id" to it.questionId, "selected_option_id" to it.selectedOptionId)
+            }
+            val answersJson = Gson().toJson(answerRequests).toRequestBody("application/json".toMediaTypeOrNull())
+
+            val response = apiService.submitResponse(
+                surveyIdPart, versionPart, deviceIdPart, 
+                latPart, lngPart, namePart, contactPart, 
+                answersJson, null
+            )
+
+            if (response.isSuccessful) Result.success(Unit)
+            else Result.failure(Exception("Cloud rejection: ${response.code()}"))
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -126,7 +159,7 @@ class SurveyRepository(
             gpsLat = lat,
             gpsLng = lng,
             respondentPhotoPath = photoPath,
-            answersJson = "",
+            answersJson = Gson().toJson(answers),
             isSynced = false
         )
         

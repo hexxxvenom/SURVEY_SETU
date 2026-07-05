@@ -3,7 +3,7 @@ package com.surveysetu.app.data
 import android.content.Context
 import android.content.SharedPreferences
 
-class SessionManager(context: Context) {
+class SessionManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("surveysetu_prefs", Context.MODE_PRIVATE)
 
     fun saveSession(token: String, role: String, name: String, username: String) {
@@ -20,9 +20,11 @@ class SessionManager(context: Context) {
     fun getUserName(): String? = prefs.getString("user_name", null)
     fun getUserId(): String? = prefs.getString("user_id", null)
 
-    fun getDeviceId(context: Context): String {
+    fun getDeviceIdAcrossContext(): String {
         return android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "UNKNOWN"
     }
+
+    fun getDeviceId(ignored: Context): String = getDeviceIdAcrossContext()
 
     fun clearSession() {
         prefs.edit().clear().apply()

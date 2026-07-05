@@ -77,6 +77,9 @@ dependencies {
     // Thermal Printing Engine
     implementation("com.github.DantSu:ESCPOS-ThermalPrinter-Android:3.3.0")
     
+    // Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    
     // Room Database
     val roomVersion = "2.8.4"
     implementation("androidx.room:room-runtime:$roomVersion")

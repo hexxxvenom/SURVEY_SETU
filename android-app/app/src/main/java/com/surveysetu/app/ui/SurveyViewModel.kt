@@ -32,19 +32,16 @@ class SurveyViewModel(
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     init {
-        // Load everything at once so transitions are instant
         loadLocalSurveys(triggerSyncIfEmpty = true)
     }
 
     fun loadLocalSurveys(triggerSyncIfEmpty: Boolean = false) {
-        // Only show loading if we have absolutely nothing
         if (_surveyState.value !is SurveyState.Success) {
             _surveyState.value = SurveyState.Loading
         }
         
         viewModelScope.launch {
             try {
-                // AUTH STATUS CHECK
                 val me = RetrofitClient.apiService.getMe()
                 if (me.code() == 401 || me.code() == 403 || (me.isSuccessful && me.body()?.status == "LOCKED")) {
                     _surveyState.value = SurveyState.Error("ACCOUNT_LOCKED")
@@ -66,9 +63,7 @@ class SurveyViewModel(
                         }
                         SurveyWithQuestions(survey, uiQuestions)
                     }
-                    // DATA IS NOW FULLY CACHED IN STATE
                     _surveyState.value = SurveyState.Success(surveysWithQuestions)
-                    Log.d("SurveyViewModel", "Data Pre-loaded for instant access.")
                 } else if (triggerSyncIfEmpty) {
                     syncSurveys()
                 } else {
@@ -92,6 +87,7 @@ class SurveyViewModel(
         }
     }
 
+    // UPDATED: Real-time Cloud Submission
     fun submitSurvey(
         survey: SurveyEntity, 
         answers: Map<String, String>, 
@@ -102,16 +98,31 @@ class SurveyViewModel(
         _isSubmitting.value = true
         viewModelScope.launch {
             val answerList = answers.map { AnswerUiModel(it.key, it.value) }
+            
+            // 1. Force upload to cloud immediately
+            val result = repository.uploadResponse(
+                surveyId = survey.id,
+                version = survey.version,
+                deviceId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext(),
+                lat = null, // GPS logic maintained in another module
+                lng = null,
+                name = respondentName,
+                contact = respondentContact,
+                answers = answerList
+            )
+            
+            // 2. Local backup
             repository.saveResponseLocally(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = "VERIFIED_HW", 
+                deviceId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext(), 
                 surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "---",
                 lat = null,
                 lng = null,
                 photoPath = null,
                 answers = answerList
             )
+
             _isSubmitting.value = false
             onComplete()
         }
