@@ -15,20 +15,25 @@ import androidx.compose.ui.unit.sp
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PrintSettingsScreen(
-    surveyLanguage: String, // "en", "hi", or "bilingual" detected from survey mission
-    onPrint: (Int, String, Int) -> Unit // paperSize, fontName, fontSize
+    surveyLanguage: String,
+    currentPaperSize: Int,
+    currentFontName: String,
+    currentFontSize: Int,
+    onPrint: (Int, String, Int) -> Unit
 ) {
-    var paperSize by remember { mutableIntStateOf(58) }
-    var fontSize by remember { mutableIntStateOf(24) }
+    var paperSize by remember { mutableIntStateOf(currentPaperSize) }
+    var fontSize by remember { mutableIntStateOf(currentFontSize) }
     
     val hindiFonts = listOf("Mangal", "KrutiDev", "Kokila", "Utsaah", "Aparajita")
     val englishFonts = listOf("Roboto", "Montserrat", "OpenSans", "Lato", "Playfair")
 
-    // AUTODETECT: Determine which font list to show
     val isHindi = surveyLanguage.contains("hi", ignoreCase = true) || surveyLanguage.contains("hindi", ignoreCase = true)
     val availableFonts = if (isHindi) hindiFonts else englishFonts
     
-    var selectedFont by remember { mutableStateOf(availableFonts.first()) }
+    // Initialize with current font, but fallback to first if not in list
+    var selectedFont by remember { 
+        mutableStateOf(if (availableFonts.contains(currentFontName)) currentFontName else availableFonts.first()) 
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Print Configuration") }) }
@@ -40,7 +45,6 @@ fun PrintSettingsScreen(
                 .padding(24.dp)
         ) {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                // AUTO-DETECTION BADGE
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -55,7 +59,6 @@ fun PrintSettingsScreen(
                     }
                 }
 
-                // 1. Paper Size
                 item {
                     Text("1. Paper Width", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     Row(modifier = Modifier.padding(vertical = 8.dp)) {
@@ -66,7 +69,6 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 2. Font Selection (Automatically filtered by detected language)
                 item {
                     Text("2. Select Font", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp), maxItemsInEachRow = 3) {
@@ -82,7 +84,6 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 3. Font Size
                 item {
                     Text("3. Font Size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     Row(modifier = Modifier.padding(vertical = 8.dp)) {
@@ -98,7 +99,6 @@ fun PrintSettingsScreen(
                     }
                 }
 
-                // 4. LIVE PREVIEW
                 item {
                     Spacer(modifier = Modifier.height(32.dp))
                     Card(
@@ -127,7 +127,7 @@ fun PrintSettingsScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
                 shape = MaterialTheme.shapes.large
             ) {
-                Text("PRINT RECEIPT", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Text("APPLY & SAVE SETTINGS", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
         }
     }
