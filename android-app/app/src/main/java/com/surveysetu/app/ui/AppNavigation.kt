@@ -22,7 +22,7 @@ fun AppNavigation() {
         }
         
         composable("selfie") {
-            SelfieScreen(onSelfieCaptured = { 
+            SelfieScreen(onClockInSuccess = {
                 navController.navigate("dashboard") {
                     popUpTo("login") { inclusive = true }
                 }

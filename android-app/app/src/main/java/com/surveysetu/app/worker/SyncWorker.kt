@@ -18,7 +18,7 @@ class SyncWorker(
         return try {
             val db = Room.databaseBuilder(
                 applicationContext,
-                SurveyDatabase::class.java, "survey-db"
+                SurveyDatabase::class.java, "survey_setu.db"
             ).build()
             
             val dao = db.surveyDao()
@@ -28,14 +28,15 @@ class SyncWorker(
             var allSuccess = true
 
             for (response in unsynced) {
-                // Convert to RequestBody Parts
                 val surveyIdPart = response.surveyId.toRequestBody("text/plain".toMediaTypeOrNull())
                 val surveyVersionPart = response.surveyVersion.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                 val deviceIdPart = response.deviceId.toRequestBody("text/plain".toMediaTypeOrNull())
                 
-                // In a real app, we would fetch answers from the DB and convert to JSON
-                val answersPart = "[]".toRequestBody("application/json".toMediaTypeOrNull())
+                // Fetch name and contact (In a real app, these would be in the Response table)
+                val namePart = "Field Respondent".toRequestBody("text/plain".toMediaTypeOrNull())
+                val contactPart = "N/A".toRequestBody("text/plain".toMediaTypeOrNull())
                 
+                val answersPart = "[]".toRequestBody("application/json".toMediaTypeOrNull())
                 val gpsLatPart = response.gpsLat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val gpsLngPart = response.gpsLng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
 
@@ -45,6 +46,8 @@ class SyncWorker(
                     deviceId = deviceIdPart,
                     gpsLat = gpsLatPart,
                     gpsLng = gpsLngPart,
+                    name = namePart,
+                    contact = contactPart,
                     answers = answersPart,
                     respondentPhoto = null
                 )

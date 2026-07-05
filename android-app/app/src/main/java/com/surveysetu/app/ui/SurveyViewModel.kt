@@ -15,7 +15,7 @@ sealed class SurveyState {
 }
 
 class SurveyViewModel(
-    private val repository: SurveyRepository,
+    val repository: SurveyRepository,
     private val surveyDao: SurveyDao
 ) : ViewModel() {
 

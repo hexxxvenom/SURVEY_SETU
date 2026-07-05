@@ -10,13 +10,20 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
+    // --- New Attendance Endpoints ---
     @Multipart
-    @POST("auth/selfie-verify")
-    suspend fun verifySelfie(
-        @Part("sessionId") sessionId: RequestBody,
-        @Part selfie: MultipartBody.Part
+    @POST("attendance/clock-in")
+    suspend fun clockIn(
+        @Part("device_id") deviceId: RequestBody,
+        @Part("gps_lat") gpsLat: RequestBody?,
+        @Part("gps_lng") gpsLng: RequestBody?,
+        @Part selfie: MultipartBody.Part?
     ): Response<Unit>
 
+    @POST("attendance/clock-out")
+    suspend fun clockOut(): Response<Unit>
+
+    // --- Survey Endpoints ---
     @GET("surveys/active")
     suspend fun getActiveSurveys(): Response<List<SurveyResponse>>
 
@@ -28,7 +35,9 @@ interface ApiService {
         @Part("device_id") deviceId: RequestBody,
         @Part("gps_lat") gpsLat: RequestBody?,
         @Part("gps_lng") gpsLng: RequestBody?,
-        @Part("answers") answers: RequestBody, // JSON string of List<AnswerRequest>
+        @Part("respondent_name") name: RequestBody?,
+        @Part("respondent_contact") contact: RequestBody?,
+        @Part("answers") answers: RequestBody,
         @Part respondentPhoto: MultipartBody.Part?
     ): Response<Unit>
 
