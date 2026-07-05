@@ -21,16 +21,22 @@ router.get('/app-branding', async (req, res) => {
 // Admin only: Change the app login title
 router.post('/app-branding', authenticate, authorize(['SUPER_ADMIN']), async (req: AuthRequest, res) => {
     const { title } = req.body;
-    await prisma.auditLog.create({
-        data: {
-            actor_user_id: req.user!.id,
-            action_type: 'UPDATE_APP_TITLE',
-            target_entity: 'SystemConfig',
-            target_id: 'app_title',
-            details_json: JSON.stringify({ title })
-        }
-    });
-    res.json({ success: true });
+    if (!title) return res.status(400).json({ error: "Title is required" });
+
+    try {
+        await prisma.auditLog.create({
+            data: {
+                actor_user_id: req.user!.id,
+                action_type: 'UPDATE_APP_TITLE',
+                target_entity: 'SystemConfig',
+                target_id: 'app_title',
+                details_json: JSON.stringify({ title })
+            }
+        });
+        res.json({ success: true, title });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 export default router;
