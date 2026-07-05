@@ -2,9 +2,17 @@ import { Router } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import prisma from '../prisma';
 import multer from 'multer';
+import fs from 'fs';
 
 const router = Router();
-const upload = multer({ dest: 'uploads/attendance/' });
+const uploadDir = 'uploads/attendance/';
+
+// Ensure directory exists at runtime
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({ dest: uploadDir });
 
 router.use(authenticate);
 
@@ -16,10 +24,19 @@ router.post('/clock-in', upload.single('selfie'), async (req: AuthRequest, res) 
   try {
     const selfie_photo_url = req.file ? `/uploads/attendance/${req.file.filename}` : null;
 
+    // FIND THE DEVICE RECORD
+    const device = await prisma.device.findUnique({
+        where: { device_identifier: device_id }
+    });
+
+    if (!device) {
+        return res.status(404).json({ error: "Device hardware not found in registry" });
+    }
+
     const session = await prisma.loginSession.create({
       data: {
         user_id,
-        device_id,
+        device_id: device.id, // Must use the DB internal UUID, not the identifier
         selfie_photo_url,
         gps_lat: gps_lat ? parseFloat(gps_lat) : null,
         gps_lng: gps_lng ? parseFloat(gps_lng) : null,
@@ -29,7 +46,8 @@ router.post('/clock-in', upload.single('selfie'), async (req: AuthRequest, res) 
 
     res.status(201).json(session);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error("[ATTENDANCE ERROR]", err);
+    res.status(500).json({ error: err.message || "Internal Attendance Error" });
   }
 });
 
@@ -38,7 +56,6 @@ router.post('/clock-out', async (req: AuthRequest, res) => {
   const user_id = req.user!.id;
 
   try {
-    // Find the latest active session for this user
     const lastSession = await prisma.loginSession.findFirst({
       where: { user_id, logout_timestamp: null },
       orderBy: { login_timestamp: 'desc' }
