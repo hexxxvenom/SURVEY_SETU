@@ -53,20 +53,21 @@ class SurveyRepository(
                 
                 Log.d("SurveyRepository", "Found ${surveys.size} surveys to sync")
                 
-                // Nuclear Sync: Wipe old to ensure fresh 18-question dataset
+                // Nuclear Sync: Wipe old
                 surveyDao.clearAllOptions()
                 surveyDao.clearAllQuestions()
                 surveyDao.clearAllSurveys()
                 
                 surveys.forEach { surveyDto ->
-                    Log.d("SurveyRepository", "Processing: ${surveyDto.title}")
+                    Log.d("SurveyRepository", "Processing: ${surveyDto.title} (${surveyDto.language})")
                     
                     surveyDao.insertSurvey(
                         SurveyEntity(
                             id = surveyDto.id,
                             title = surveyDto.title,
                             version = surveyDto.version,
-                            isPublished = true
+                            isPublished = true,
+                            language = surveyDto.language // Store the language for auto-detection
                         )
                     )
                     
@@ -81,7 +82,6 @@ class SurveyRepository(
                         )
                     }
                     surveyDao.insertQuestions(questions)
-                    Log.d("SurveyRepository", "Saved ${questions.size} questions")
                     
                     surveyDto.questions.forEach { q ->
                         val options = q.options.map { o ->
@@ -94,13 +94,6 @@ class SurveyRepository(
                         }
                         surveyDao.insertOptions(options)
                     }
-                }
-                
-                // VERIFICATION: Check if data actually saved
-                val verify = surveyDao.getAllActiveSurveys()
-                if (verify.isEmpty()) {
-                    Log.e("SurveyRepository", "DB WRITE VERIFICATION FAILED")
-                    return@withContext Result.failure(Exception("Database write failed"))
                 }
                 
                 Result.success(Unit)

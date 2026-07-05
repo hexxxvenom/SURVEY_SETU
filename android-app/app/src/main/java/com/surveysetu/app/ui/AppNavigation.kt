@@ -21,7 +21,6 @@ fun AppNavigation() {
     // Global Print State
     var paperSize by remember { mutableIntStateOf(58) }
     var selectedFontName by remember { mutableStateOf("Roboto") }
-    var languageMode by remember { mutableStateOf("English") }
     var fontSize by remember { mutableIntStateOf(24) }
 
     NavHost(navController = navController, startDestination = "login") {
@@ -98,11 +97,12 @@ fun AppNavigation() {
         }
 
         composable("print_wizard") {
+            // FIXED: Pass the language of the current survey for auto-detection
             PrintSettingsScreen(
-                onPrint = { size, font, mode, scale ->
+                surveyLanguage = selectedSurvey?.language ?: "en",
+                onPrint = { size, font, scale ->
                     paperSize = size
                     selectedFontName = font
-                    languageMode = mode
                     fontSize = scale
                     navController.popBackStack()
                 }

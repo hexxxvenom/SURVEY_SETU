@@ -3,7 +3,6 @@ package com.surveysetu.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,26 +12,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PrintSettingsScreen(
-    onPrint: (Int, String, String, Int) -> Unit // paperSize, fontName, languageMode, fontSize
+    surveyLanguage: String, // "en", "hi", or "bilingual" detected from survey mission
+    onPrint: (Int, String, Int) -> Unit // paperSize, fontName, fontSize
 ) {
     var paperSize by remember { mutableIntStateOf(58) }
-    var languageMode by remember { mutableStateOf("English") } // English, Hindi, Bilingual
-    var selectedFont by remember { mutableStateOf("Roboto") }
     var fontSize by remember { mutableIntStateOf(24) }
-
+    
     val hindiFonts = listOf("Mangal", "KrutiDev", "Kokila", "Utsaah", "Aparajita")
     val englishFonts = listOf("Roboto", "Montserrat", "OpenSans", "Lato", "Playfair")
 
-    // Update default font when language changes
-    LaunchedEffect(languageMode) {
-        selectedFont = if (languageMode == "Hindi") "Mangal" else "Roboto"
-    }
+    // AUTODETECT: Determine which font list to show
+    val isHindi = surveyLanguage.contains("hi", ignoreCase = true) || surveyLanguage.contains("hindi", ignoreCase = true)
+    val availableFonts = if (isHindi) hindiFonts else englishFonts
+    
+    var selectedFont by remember { mutableStateOf(availableFonts.first()) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Print Wizard") }) }
+        topBar = { TopAppBar(title = { Text("Print Configuration") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -41,6 +40,21 @@ fun PrintSettingsScreen(
                 .padding(24.dp)
         ) {
             LazyColumn(modifier = Modifier.weight(1f)) {
+                // AUTO-DETECTION BADGE
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val langLabel = if (isHindi) "HINDI (Detected)" else "ENGLISH (Detected)"
+                            Text("Language: ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(langLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+
                 // 1. Paper Size
                 item {
                     Text("1. Paper Width", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
@@ -52,28 +66,11 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 2. Language Selection
+                // 2. Font Selection (Automatically filtered by detected language)
                 item {
-                    Text("2. Document Language", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
-                    Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                        listOf("English", "Hindi", "Bilingual").forEach { mode ->
-                            FilterChip(
-                                selected = languageMode == mode,
-                                onClick = { languageMode = mode },
-                                label = { Text(mode) },
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                        }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
-                }
-
-                // 3. Font Selection (Conditional)
-                item {
-                    val currentFonts = if (languageMode == "Hindi") hindiFonts else englishFonts
-                    Text("3. Typography Style", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Text("2. Select Font", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp), maxItemsInEachRow = 3) {
-                        currentFonts.forEach { font ->
+                        availableFonts.forEach { font ->
                             FilterChip(
                                 selected = selectedFont == font,
                                 onClick = { selectedFont = font },
@@ -85,9 +82,9 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 4. Font Size
+                // 3. Font Size
                 item {
-                    Text("4. Text Scale", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Text("3. Font Size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     Row(modifier = Modifier.padding(vertical = 8.dp)) {
                         listOf(18, 24, 32).forEach { size ->
                             val label = when(size) { 18 -> "Small"; 24 -> "Medium"; else -> "Large" }
@@ -101,33 +98,36 @@ fun PrintSettingsScreen(
                     }
                 }
 
-                // 5. MINI PREVIEW (World-Class UX)
+                // 4. LIVE PREVIEW
                 item {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("LIVE PRINT PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("MISSION RECORD", fontSize = (fontSize/1.5).sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            Text("RECEIPT PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            val previewText = if (isHindi) "मिशन रिकॉर्ड" else "MISSION RECORD"
+                            Text(previewText, fontSize = (fontSize/1.5).sp, fontWeight = FontWeight.Black, color = Color.Black)
                             Text("--------------------------", color = Color.Gray)
                             Text("Respondent: Amit Kumar", fontSize = (fontSize/2).sp, color = Color.Black)
-                            Text("1. Primary Source of Energy?", fontSize = (fontSize/2).sp, color = Color.Black)
-                            Text("   Ans: Solar / सौर ऊर्जा", fontSize = (fontSize/2).sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            val qPreview = if (isHindi) "1. ऊर्जा का मुख्य स्रोत?" else "1. Primary Energy Source?"
+                            val aPreview = if (isHindi) "उत्तर: सौर ऊर्जा" else "Ans: Solar Power"
+                            Text(qPreview, fontSize = (fontSize/2).sp, color = Color.Black)
+                            Text(aPreview, fontSize = (fontSize/2).sp, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                     }
                 }
             }
 
             Button(
-                onClick = { onPrint(paperSize, selectedFont, languageMode, fontSize) },
+                onClick = { onPrint(paperSize, selectedFont, fontSize) },
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
                 shape = MaterialTheme.shapes.large
             ) {
-                Text("EXECUTE CLOUD PRINT", fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                Text("PRINT RECEIPT", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
         }
     }

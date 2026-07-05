@@ -11,7 +11,8 @@ data class SurveyEntity(
     @PrimaryKey val id: String,
     val title: String,
     val version: Int,
-    val isPublished: Boolean
+    val isPublished: Boolean,
+    val language: String // Added for auto-language detection in printing
 )
 
 @Entity(tableName = "questions")
@@ -34,7 +35,7 @@ data class ResponseEntity(
     val gpsLat: Double?,
     val gpsLng: Double?,
     val respondentPhotoPath: String?,
-    val answersJson: String, // Storing as JSON for simplicity in SQLite
+    val answersJson: String, 
     val isSynced: Boolean = false
 )
 
@@ -54,7 +55,7 @@ data class AnswerEntity(
     val selectedOptionId: String
 )
 
-@Database(entities = [SurveyEntity::class, QuestionEntity::class, OptionEntity::class, ResponseEntity::class, AnswerEntity::class], version = 1)
+@Database(entities = [SurveyEntity::class, QuestionEntity::class, OptionEntity::class, ResponseEntity::class, AnswerEntity::class], version = 2, exportSchema = false)
 abstract class SurveyDatabase : RoomDatabase() {
     abstract fun surveyDao(): SurveyDao
 }
