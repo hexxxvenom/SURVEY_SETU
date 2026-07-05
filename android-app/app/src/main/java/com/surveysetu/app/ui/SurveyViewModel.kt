@@ -40,7 +40,7 @@ class SurveyViewModel(
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
             try {
-                // REAL-TIME SECURITY LOCK
+                // AUTH STATUS CHECK
                 val me = RetrofitClient.apiService.getMe()
                 if (me.code() == 401 || me.code() == 403 || (me.isSuccessful && me.body()?.status == "LOCKED")) {
                     _surveyState.value = SurveyState.Error("ACCOUNT_LOCKED")
@@ -66,34 +66,34 @@ class SurveyViewModel(
                 } else if (triggerSyncIfEmpty) {
                     syncSurveys()
                 } else {
-                    _surveyState.value = SurveyState.Error("No data found. Please check Cloud Sync.")
+                    _surveyState.value = SurveyState.Error("Mission library empty.")
                 }
             } catch (e: Exception) {
-                Log.e("SurveyViewModel", "Load failed", e)
-                _surveyState.value = SurveyState.Error("Connection Error: Check Internet")
+                _surveyState.value = SurveyState.Error("Offline: Connect to Cloud")
             }
         }
     }
 
     fun loadSingleSurvey(surveyId: String) {
-        // ULTIMATE STABILITY: Skip loading if already showing the correct data
-        val currentState = _surveyState.value
-        if (currentState is SurveyState.SingleSuccess && currentState.survey.id == surveyId) {
+        // PREVENT RACE CONDITION: If already in SingleSuccess for this ID, do not reload
+        val current = _surveyState.value
+        if (current is SurveyState.SingleSuccess && current.survey.id == surveyId) {
+            Log.d("SurveyViewModel", "Bypassing redundant load for ID: $surveyId")
             return
         }
 
-        // Show spinner while fetching from local DB
         _surveyState.value = SurveyState.Loading
         
         viewModelScope.launch {
             try {
+                Log.i("SurveyViewModel", "Loading Mission: $surveyId")
                 val survey = surveyDao.getAllActiveSurveys().find { it.id == surveyId }
                 if (survey != null) {
                     val questions = surveyDao.getQuestionsForSurvey(survey.id)
                     
-                    // CRITICAL FIX: Ensure questions exist before switching state
                     if (questions.isEmpty()) {
-                        _surveyState.value = SurveyState.Error("Missing questions in this survey mission.")
+                        Log.e("SurveyViewModel", "No questions found in DB for ID: $surveyId")
+                        _surveyState.value = SurveyState.Error("Data corrupted. Perform Cloud Sync.")
                         return@launch
                     }
 
@@ -106,14 +106,16 @@ class SurveyViewModel(
                             options = options.map { o -> OptionUiModel(o.id, o.optionText) }
                         )
                     }
+                    
                     _surveyState.value = SurveyState.SingleSuccess(survey, uiQuestions)
-                    Log.i("SurveyViewModel", "Successfully entered Mission: ${survey.title}")
+                    Log.i("SurveyViewModel", "Mission Ready: ${survey.title} (${uiQuestions.size} Qs)")
                 } else {
-                    _surveyState.value = SurveyState.Error("Mission details not found locally.")
+                    Log.e("SurveyViewModel", "Survey not found in local DB: $surveyId")
+                    _surveyState.value = SurveyState.Error("Mission data not found.")
                 }
             } catch (e: Exception) {
-                Log.e("SurveyViewModel", "Single load error", e)
-                _surveyState.value = SurveyState.Error("Critical: Failed to build mission UI.")
+                Log.e("SurveyViewModel", "Mission load error", e)
+                _surveyState.value = SurveyState.Error("System Glitch: ${e.message}")
             }
         }
     }
@@ -125,7 +127,7 @@ class SurveyViewModel(
             if (result.isSuccess) {
                 loadLocalSurveys(triggerSyncIfEmpty = false)
             } else {
-                _surveyState.value = SurveyState.Error("Cloud Sync Failed: ${result.exceptionOrNull()?.message}")
+                _surveyState.value = SurveyState.Error("Sync Barrier: ${result.exceptionOrNull()?.message}")
             }
         }
     }
@@ -143,8 +145,8 @@ class SurveyViewModel(
             repository.saveResponseLocally(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = "HW_VERIFIED",
-                surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "UNKNOWN",
+                deviceId = "VERIFIED_HW", 
+                surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "---",
                 lat = null,
                 lng = null,
                 photoPath = null,
