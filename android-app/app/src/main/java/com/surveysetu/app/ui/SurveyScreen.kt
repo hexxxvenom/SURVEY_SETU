@@ -12,7 +12,7 @@ import com.surveysetu.app.data.SurveyEntity
 @Composable
 fun SurveyScreen(
     viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
-    onFinish: (Map<String, String>) -> Unit
+    onFinish: (Map<String, String>, List<QuestionUiModel>) -> Unit // Pass questions too for preview
 ) {
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
@@ -26,11 +26,16 @@ fun SurveyScreen(
                 CircularProgressIndicator()
             }
             is SurveyState.Error -> {
-                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                    Text(state.message, color = MaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.syncSurveys() }) {
-                        Text("Sync Now")
+                if (state.message == "ACCOUNT_LOCKED") {
+                   // This is handled in Dashboard but adding safety check here
+                   Text("Session Expired: Device Locked", color = MaterialTheme.colorScheme.error)
+                } else {
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                        Text(state.message, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.syncSurveys() }) {
+                            Text("Retry Sync")
+                        }
                     }
                 }
             }
@@ -40,7 +45,7 @@ fun SurveyScreen(
                     questions = state.questions,
                     isSubmitting = isSubmitting,
                     onSubmit = { answers ->
-                        onFinish(answers)
+                        onFinish(answers, state.questions)
                     }
                 )
             }

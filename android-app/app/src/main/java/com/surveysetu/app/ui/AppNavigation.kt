@@ -15,6 +15,7 @@ fun AppNavigation() {
     var respondentName by remember { mutableStateOf("") }
     var respondentContact by remember { mutableStateOf("") }
     var surveyAnswers by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var surveyQuestions by remember { mutableStateOf<List<QuestionUiModel>>(emptyList()) }
     var connectedPrinterName by remember { mutableStateOf<String?>(null) }
 
     NavHost(navController = navController, startDestination = "login") {
@@ -59,8 +60,9 @@ fun AppNavigation() {
         
         composable("survey_questions") {
             SurveyScreen(
-                onFinish = { answers ->
+                onFinish = { answers, questions ->
                     surveyAnswers = answers
+                    surveyQuestions = questions
                     navController.navigate("preview")
                 }
             )
@@ -70,7 +72,7 @@ fun AppNavigation() {
             SurveyPreviewScreen(
                 respondentName = respondentName,
                 respondentContact = respondentContact,
-                questions = emptyList(),
+                questions = surveyQuestions,
                 answers = surveyAnswers,
                 printerName = connectedPrinterName,
                 onFinish = {
