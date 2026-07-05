@@ -26,50 +26,37 @@ fun SurveyScreen(
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
 
-    // DEBUG: Log the transition
-    LaunchedEffect(surveyId) {
-        Log.i("SurveyScreen", "Screen Initiated for ID: $surveyId")
-        viewModel.loadSingleSurvey(surveyId)
-    }
-
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         when (val state = surveyState) {
-            is SurveyState.Loading -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Loading Questions...", style = MaterialTheme.typography.bodySmall)
+            is SurveyState.Success -> {
+                // INSTANT DATA RETRIEVAL: Find the mission from the pre-loaded global state
+                val data = state.surveys.find { it.survey.id == surveyId }
+                
+                if (data != null) {
+                    SurveyContent(
+                        survey = data.survey,
+                        questions = data.questions,
+                        isSubmitting = isSubmitting,
+                        onSubmit = { answers ->
+                            onFinish(answers, data.questions)
+                        }
+                    )
+                } else {
+                    // This only shows if the ID is invalid, not during loading
+                    Text("Mission data not found. Please sync from Dashboard.")
                 }
             }
             is SurveyState.Error -> {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Initialization Failed", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
-                    Text(state.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.loadSingleSurvey(surveyId) }) {
-                        Text("Retry Load")
-                    }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.message, color = MaterialTheme.colorScheme.error)
+                    Button(onClick = { viewModel.syncSurveys() }) { Text("Retry Sync") }
                 }
             }
-            is SurveyState.SingleSuccess -> {
-                // VERIFIED DATA: Start internal content
-                SurveyContent(
-                    survey = state.survey,
-                    questions = state.questions,
-                    isSubmitting = isSubmitting,
-                    onSubmit = { answers ->
-                        onFinish(answers, state.questions)
-                    }
-                )
-            }
-            is SurveyState.Success -> {
-                // Dashboard state lingering, just show loader
+            else -> {
+                // INITIAL LOAD ONLY: We show a spinner only once when the app first opens
                 CircularProgressIndicator()
             }
         }
@@ -84,18 +71,9 @@ private fun SurveyContent(
     isSubmitting: Boolean,
     onSubmit: (Map<String, String>) -> Unit
 ) {
-    // ULTIMATE STABILITY GUARD: Handle empty questions gracefully
-    if (questions.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Mission contains no questions. Re-sync from Dashboard.")
-        }
-        return
-    }
-
     var currentIndex by remember { mutableIntStateOf(0) }
     val answers = remember { mutableStateMapOf<String, String>() }
 
-    // Ensure we never crash on index out of bounds
     val safeIndex = currentIndex.coerceIn(0, questions.size - 1)
     val currentQuestion = questions[safeIndex]
 
@@ -133,7 +111,6 @@ private fun SurveyContent(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // OPTIONS RENDERER
             Column(modifier = Modifier.weight(1f)) {
                 currentQuestion.options.forEach { option ->
                     val selected = answers[currentQuestion.id] == option.id
