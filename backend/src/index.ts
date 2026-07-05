@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin';
 import surveyRoutes from './routes/surveys';
 import responseRoutes from './routes/responses';
 import attendanceRoutes from './routes/attendance';
+import configRoutes from './routes/config';
 
 // SECURITY: Load local .env only if not in production
 if (process.env.NODE_ENV !== 'production') {
@@ -58,6 +59,7 @@ app.use('/admin', adminRoutes);
 app.use('/surveys', surveyRoutes);
 app.use('/responses', responseRoutes);
 app.use('/attendance', attendanceRoutes);
+app.use('/config', configRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {

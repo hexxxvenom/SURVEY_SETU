@@ -50,6 +50,7 @@ model User {
 
 model Device {
   id                    String         @id @default(uuid())
+  device_name           String?        // Friendly name for identification
   device_identifier     String         @unique
   assigned_user_id      String?
   status                Status         @default(ACTIVE)
