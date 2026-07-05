@@ -43,14 +43,21 @@ fun SurveyScreen(
                 }
             }
             is SurveyState.Success -> {
-                SurveyContent(
-                    survey = state.survey,
-                    questions = state.questions,
-                    isSubmitting = isSubmitting,
-                    onSubmit = { answers ->
-                        onFinish(answers, state.questions)
-                    }
-                )
+                // IMPORTANT: In the new multi-survey mode, we need to know WHICH survey to show.
+                // For this demo, we assume there's at least one.
+                val data = state.surveys.firstOrNull()
+                if (data != null) {
+                    SurveyContent(
+                        survey = data.survey,
+                        questions = data.questions,
+                        isSubmitting = isSubmitting,
+                        onSubmit = { answers ->
+                            onFinish(answers, data.questions)
+                        }
+                    )
+                } else {
+                    Text("No questions found in this survey.")
+                }
             }
         }
     }
