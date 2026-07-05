@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.surveysetu.app.data.SurveyEntity
 
+// REDECLARE UI MODELS TO RESOLVE COMPILATION SCOPE ISSUES
 data class QuestionUiModel(val id: String, val text: String, val isMandatory: Boolean, val options: List<OptionUiModel>)
 data class OptionUiModel(val id: String, val text: String)
 data class AnswerUiModel(val questionId: String, val selectedOptionId: String)
@@ -22,7 +23,7 @@ fun SurveyScreen(
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
 
-    // Load the specific survey on launch
+    // Force specific survey load to prevent race conditions with dashboard sync
     LaunchedEffect(surveyId) {
         viewModel.loadSingleSurvey(surveyId)
     }
@@ -59,8 +60,7 @@ fun SurveyScreen(
                 )
             }
             is SurveyState.Success -> {
-                // If we are in multi-view but need single, the LaunchedEffect will handle it.
-                // Show loading while waiting for the SingleSuccess transition.
+                // If dashboard Success state persists briefly, keep the spinner active
                 CircularProgressIndicator()
             }
         }
