@@ -30,13 +30,12 @@ fun PrintSettingsScreen(
     val isHindi = surveyLanguage.contains("hi", ignoreCase = true) || surveyLanguage.contains("hindi", ignoreCase = true)
     val availableFonts = if (isHindi) hindiFonts else englishFonts
     
-    // Initialize with current font, but fallback to first if not in list
     var selectedFont by remember { 
         mutableStateOf(if (availableFonts.contains(currentFontName)) currentFontName else availableFonts.first()) 
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Print Configuration") }) }
+        topBar = { TopAppBar(title = { Text("Advanced Print Wizard") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -45,6 +44,7 @@ fun PrintSettingsScreen(
                 .padding(24.dp)
         ) {
             LazyColumn(modifier = Modifier.weight(1f)) {
+                // AUTO-DETECTION BADGE
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -59,16 +59,18 @@ fun PrintSettingsScreen(
                     }
                 }
 
+                // 1. Paper Size (Added 112mm / 4-inch)
                 item {
                     Text("1. Paper Width", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
-                    Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                        FilterChip(selected = paperSize == 58, onClick = { paperSize = 58 }, label = { Text("2-inch (58mm)") })
-                        Spacer(modifier = Modifier.width(8.dp))
-                        FilterChip(selected = paperSize == 80, onClick = { paperSize = 80 }, label = { Text("3-inch (80mm)") })
+                    FlowRow(modifier = Modifier.padding(vertical = 8.dp)) {
+                        FilterChip(selected = paperSize == 58, onClick = { paperSize = 58 }, label = { Text("2\" (58mm)") }, modifier = Modifier.padding(end = 8.dp))
+                        FilterChip(selected = paperSize == 80, onClick = { paperSize = 80 }, label = { Text("3\" (80mm)") }, modifier = Modifier.padding(end = 8.dp))
+                        FilterChip(selected = paperSize == 112, onClick = { paperSize = 112 }, label = { Text("4\" (112mm)") })
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
+                // 2. Font Selection
                 item {
                     Text("2. Select Font", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp), maxItemsInEachRow = 3) {
@@ -84,11 +86,14 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
+                // 3. Font Size (Expanded to include Extra Large and Jumbo)
                 item {
-                    Text("3. Font Size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
-                    Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                        listOf(18, 24, 32).forEach { size ->
-                            val label = when(size) { 18 -> "Small"; 24 -> "Medium"; else -> "Large" }
+                    Text("3. Font Size (Scalable)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    FlowRow(modifier = Modifier.padding(vertical = 8.dp)) {
+                        listOf(18, 24, 32, 40, 48).forEach { size ->
+                            val label = when(size) { 
+                                18 -> "S"; 24 -> "M"; 32 -> "L"; 40 -> "XL"; else -> "XXL" 
+                            }
                             FilterChip(
                                 selected = fontSize == size,
                                 onClick = { fontSize = size },
@@ -97,8 +102,10 @@ fun PrintSettingsScreen(
                             )
                         }
                     }
+                    Text(text = "Current Scale: ${fontSize}sp", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
 
+                // 4. LIVE PREVIEW
                 item {
                     Spacer(modifier = Modifier.height(32.dp))
                     Card(
@@ -107,9 +114,10 @@ fun PrintSettingsScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("RECEIPT PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
+                            Text("DYNAMIC RECEIPT PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
                             Spacer(modifier = Modifier.height(12.dp))
                             val previewText = if (isHindi) "मिशन रिकॉर्ड" else "MISSION RECORD"
+                            // Scaling the preview to match relative size
                             Text(previewText, fontSize = (fontSize/1.5).sp, fontWeight = FontWeight.Black, color = Color.Black)
                             Text("--------------------------", color = Color.Gray)
                             Text("Respondent: Amit Kumar", fontSize = (fontSize/2).sp, color = Color.Black)
@@ -124,10 +132,11 @@ fun PrintSettingsScreen(
 
             Button(
                 onClick = { onPrint(paperSize, selectedFont, fontSize) },
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
-                shape = MaterialTheme.shapes.large
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(top = 16.dp),
+                shape = MaterialTheme.shapes.large,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("APPLY & SAVE SETTINGS", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Text("SAVE & ACTIVATE PRINT", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
         }
     }

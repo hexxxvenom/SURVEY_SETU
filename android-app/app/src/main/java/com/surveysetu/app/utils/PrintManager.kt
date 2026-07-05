@@ -17,9 +17,8 @@ import kotlinx.coroutines.withContext
 object PrintManager {
 
     /**
-     * THREAD-SAFE PRINTING ENGINE:
-     * Moves all heavy bitmap generation and Bluetooth data transfer to 
-     * a background thread to prevent app crashes and "glitches".
+     * WORLD-CLASS PRINTING ENGINE V3:
+     * High-scale font support and 4-inch (112mm) paper width integration.
      */
     @SuppressLint("MissingPermission")
     suspend fun printSurveyReceipt(
@@ -42,6 +41,8 @@ object PrintManager {
             val connection = BluetoothPrintersConnections().getList()?.find { it.getDevice().address == device.address }
                 ?: return@withContext Result.failure(Exception("Connection failed"))
 
+            // DPI and paper width calculation for ESC/POS
+            // 58mm = ~384px, 80mm = ~576px, 112mm = ~864px
             val printer = EscPosPrinter(connection, 203, paperSizeMm.toFloat(), 32)
             
             val bitmap = generateReceiptBitmap(
@@ -75,7 +76,13 @@ object PrintManager {
         fontName: String,
         fontSize: Float
     ): Bitmap {
-        val widthPx = if (widthMm == 80) 576 else 384
+        // Precise pixel calculation for large widths
+        val widthPx = when (widthMm) {
+            112 -> 864
+            80 -> 576
+            else -> 384
+        }
+        
         val paint = TextPaint().apply {
             color = Color.BLACK
             textSize = fontSize
@@ -89,7 +96,7 @@ object PrintManager {
         content.append("Respondent: $name\n")
         content.append("Contact: $contact\n")
         content.append("--------------------------------\n")
-
+        
         questions.forEachIndexed { i, q ->
             val ans = q.options.find { it.id == answers[q.id] }?.text ?: "N/A"
             content.append("${i + 1}. ${q.text}\n")
@@ -101,10 +108,10 @@ object PrintManager {
             .setLineSpacing(0f, 1.2f)
             .build()
 
-        val bitmap = Bitmap.createBitmap(widthPx, staticLayout.height + 40, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(widthPx, staticLayout.height + 60, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
-        canvas.translate(0f, 20f)
+        canvas.translate(0f, 30f)
         staticLayout.draw(canvas)
 
         return bitmap
