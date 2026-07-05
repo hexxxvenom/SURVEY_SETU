@@ -17,8 +17,9 @@ import kotlinx.coroutines.withContext
 object PrintManager {
 
     /**
-     * WORLD-CLASS PRINTING ENGINE V3:
-     * High-scale font support and 4-inch (112mm) paper width integration.
+     * WORLD-CLASS PRINTING ENGINE V4 (PRO-MAX):
+     * Implements massive font scaling (2.5x Multiplier) for high-readability on thermal paper.
+     * Hard-wired for 203 DPI precision across 58mm, 80mm, and 112mm paper.
      */
     @SuppressLint("MissingPermission")
     suspend fun printSurveyReceipt(
@@ -41,10 +42,11 @@ object PrintManager {
             val connection = BluetoothPrintersConnections().getList()?.find { it.getDevice().address == device.address }
                 ?: return@withContext Result.failure(Exception("Connection failed"))
 
-            // DPI and paper width calculation for ESC/POS
-            // 58mm = ~384px, 80mm = ~576px, 112mm = ~864px
             val printer = EscPosPrinter(connection, 203, paperSizeMm.toFloat(), 32)
             
+            // We use a massive 2.5x multiplier to ensure the text fills the paper width properly
+            val scaledFontSize = fontSize.toFloat() * 2.5f
+
             val bitmap = generateReceiptBitmap(
                 title = surveyTitle, 
                 name = respondentName, 
@@ -53,9 +55,10 @@ object PrintManager {
                 answers = answers, 
                 widthMm = paperSizeMm,
                 fontName = selectedFont,
-                fontSize = fontSize.toFloat()
+                fontSize = scaledFontSize
             )
 
+            // Center the massive bitmap for perfect alignment
             printer.printFormattedText(
                 "[C]<img>" + PrinterTextParserImg.bitmapToHexadecimalString(printer, bitmap) + "</img>\n\n\n"
             )
@@ -76,7 +79,7 @@ object PrintManager {
         fontName: String,
         fontSize: Float
     ): Bitmap {
-        // Precise pixel calculation for large widths
+        // High-precision pixel targets for standard thermal widths
         val widthPx = when (widthMm) {
             112 -> 864
             80 -> 576
@@ -92,26 +95,30 @@ object PrintManager {
 
         val content = StringBuilder()
         content.append("$title\n")
-        content.append("--------------------------------\n")
-        content.append("Respondent: $name\n")
-        content.append("Contact: $contact\n")
-        content.append("--------------------------------\n")
+        content.append("================================\n")
+        content.append("NAME: $name\n")
+        content.append("MOB: $contact\n")
+        content.append("================================\n\n")
         
         questions.forEachIndexed { i, q ->
             val ans = q.options.find { it.id == answers[q.id] }?.text ?: "N/A"
             content.append("${i + 1}. ${q.text}\n")
-            content.append("   Ans: $ans\n\n")
+            content.append(">> ANS: $ans\n\n")
         }
+
+        content.append("--------------------------------\n")
+        content.append("AUTHENTICATED BY SURVEYSETU\n")
 
         val staticLayout = StaticLayout.Builder.obtain(content.toString(), 0, content.length, paint, widthPx)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(0f, 1.2f)
             .build()
 
-        val bitmap = Bitmap.createBitmap(widthPx, staticLayout.height + 60, Bitmap.Config.ARGB_8888)
+        // Create bitmap with padding for tear-off
+        val bitmap = Bitmap.createBitmap(widthPx, staticLayout.height + 80, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
-        canvas.translate(0f, 30f)
+        canvas.translate(0f, 40f)
         staticLayout.draw(canvas)
 
         return bitmap
