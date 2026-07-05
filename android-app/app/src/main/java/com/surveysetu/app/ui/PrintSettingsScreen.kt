@@ -1,6 +1,8 @@
 package com.surveysetu.app.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,13 +12,16 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrintSettingsScreen(
-    onPrint: (Int, Int) -> Unit // paperSize, fontSize
+    onPrint: (Int, String) -> Unit // paperSize, fontName
 ) {
-    var paperSize by remember { mutableStateOf(58) } // 58mm, 80mm
-    var fontSize by remember { mutableStateOf(24) } // small, medium, large
+    var paperSize by remember { mutableIntStateOf(58) }
+    var selectedFont by remember { mutableStateOf("Mangal") }
+
+    val hindiFonts = listOf("Mangal", "KrutiDev", "Kokila", "Utsaah", "Aparajita")
+    val englishFonts = listOf("Roboto", "Montserrat", "OpenSans", "Lato", "Playfair")
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Print Settings") }) }
+        topBar = { TopAppBar(title = { Text("World-Class Print Settings") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -42,22 +47,39 @@ fun PrintSettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Text("Select Font Size", style = MaterialTheme.typography.titleMedium)
-            Row {
-                FilterChip(selected = fontSize == 18, onClick = { fontSize = 18 }, label = { Text("Small") })
-                Spacer(modifier = Modifier.width(8.dp))
-                FilterChip(selected = fontSize == 24, onClick = { fontSize = 24 }, label = { Text("Medium") })
-                Spacer(modifier = Modifier.width(8.dp))
-                FilterChip(selected = fontSize == 32, onClick = { fontSize = 32 }, label = { Text("Large") })
+            Text("Premium Hindi Fonts", style = MaterialTheme.typography.titleMedium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                hindiFonts.take(3).forEach { font ->
+                    FilterChip(selected = selectedFont == font, onClick = { selectedFont = font }, label = { Text(font) })
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                hindiFonts.drop(3).forEach { font ->
+                    FilterChip(selected = selectedFont == font, onClick = { selectedFont = font }, label = { Text(font) })
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text("Premium English Fonts", style = MaterialTheme.typography.titleMedium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                englishFonts.take(3).forEach { font ->
+                    FilterChip(selected = selectedFont == font, onClick = { selectedFont = font }, label = { Text(font) })
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                englishFonts.drop(3).forEach { font ->
+                    FilterChip(selected = selectedFont == font, onClick = { selectedFont = font }, label = { Text(font) })
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = { onPrint(paperSize, fontSize) },
+                onClick = { onPrint(paperSize, selectedFont) },
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
-                Text("Proceed to Printer Selection")
+                Text("Start Full-Width Printing")
             }
         }
     }

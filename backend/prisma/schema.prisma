@@ -1,10 +1,8 @@
 datasource db {
   provider = "postgresql"
-  // Using env() so it picks up the real URL at runtime
   url      = env("DATABASE_URL")
 }
 
-// Skip Prisma's built-in validation during build
 generator client {
   provider = "prisma-client-js"
 }
@@ -37,7 +35,6 @@ model User {
   created_by       String?
   linked_device_id String?
   
-  // Relations
   devices          Device[]
   responses        Response[]
   loginSessions    LoginSession[]
@@ -50,14 +47,13 @@ model User {
 
 model Device {
   id                    String         @id @default(uuid())
-  device_name           String?        // Friendly name for identification
+  device_name           String?
   device_identifier     String         @unique
   assigned_user_id      String?
   status                Status         @default(ACTIVE)
   last_seen_at          DateTime?
-  printer_default_size  String?        // e.g., "58mm", "76mm", "80mm"
+  printer_default_size  String?
   
-  // Relations
   user                  User?          @relation(fields: [assigned_user_id], references: [id])
   responses             Response[]
   loginSessions         LoginSession[]
@@ -74,7 +70,6 @@ model Survey {
   language         String         @default("en")
   created_by       String?
   
-  // Relations
   creator          User?          @relation("CreatedSurveys", fields: [created_by], references: [id])
   questions        Question[]
   responses        Response[]
@@ -88,10 +83,9 @@ model Question {
   survey_id        String
   question_text    String
   order_index      Int
-  option_count     Int            // 2, 3, or 4
+  option_count     Int
   is_mandatory     Boolean        @default(true)
   
-  // Relations
   survey           Survey         @relation(fields: [survey_id], references: [id])
   options          Option[]
   answers          Answer[]
@@ -108,7 +102,6 @@ model Option {
   option_text      String
   order_index      Int
   
-  // Relations
   question         Question       @relation(fields: [question_id], references: [id])
   answers          Answer[]
 
@@ -124,15 +117,14 @@ model Response {
   survey_version       Int
   device_id            String
   surveyor_id          String
-  respondent_name      String?        // Added for new requirement
-  respondent_contact   String?        // Added for new requirement
+  respondent_name      String?
+  respondent_contact   String?
   respondent_photo_url String?
   gps_lat              Float?
   gps_lng              Float?
   submitted_at         DateTime       @default(now())
   sync_status          String         @default("SYNCED")
   
-  // Relations
   survey               Survey         @relation(fields: [survey_id], references: [id])
   device               Device         @relation(fields: [device_id], references: [id])
   surveyor             User           @relation(fields: [surveyor_id], references: [id])
@@ -153,7 +145,6 @@ model Answer {
   question_id          String
   selected_option_id   String
   
-  // Relations
   response             Response       @relation(fields: [response_id], references: [id])
   question             Question       @relation(fields: [question_id], references: [id])
   selectedOption       Option         @relation(fields: [selected_option_id], references: [id])
@@ -170,12 +161,11 @@ model LoginSession {
   user_id              String
   device_id            String
   selfie_photo_url     String?
-  gps_lat              Float?         // Added for attendance tracking
-  gps_lng              Float?         // Added for attendance tracking
+  gps_lat              Float?
+  gps_lng              Float?
   login_timestamp      DateTime       @default(now())
   logout_timestamp     DateTime?
   
-  // Relations
   user                 User           @relation(fields: [user_id], references: [id])
   device               Device         @relation(fields: [device_id], references: [id])
 
@@ -195,7 +185,6 @@ model AuditLog {
   timestamp            DateTime       @default(now())
   details_json         String?
   
-  // Relations
   actor                User           @relation(fields: [actor_user_id], references: [id])
 
   createdAt            DateTime       @default(now())

@@ -17,6 +17,10 @@ fun AppNavigation() {
     var surveyAnswers by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var surveyQuestions by remember { mutableStateOf<List<QuestionUiModel>>(emptyList()) }
     var connectedPrinterName by remember { mutableStateOf<String?>(null) }
+    
+    // Print Preferences
+    var paperSize by remember { mutableIntStateOf(58) }
+    var selectedFontName by remember { mutableStateOf("Mangal") }
 
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
@@ -59,7 +63,6 @@ fun AppNavigation() {
         }
         
         composable("survey_questions") {
-            // FIXED: Use the ID of the survey selected on the dashboard
             val surveyId = selectedSurvey?.id ?: ""
             SurveyScreen(
                 surveyId = surveyId,
@@ -75,10 +78,24 @@ fun AppNavigation() {
             SurveyPreviewScreen(
                 respondentName = respondentName,
                 respondentContact = respondentContact,
-                questions = surveyQuestions,
+                questions = surveyQuestions, 
                 answers = surveyAnswers,
                 printerName = connectedPrinterName,
+                paperSizeMm = paperSize,
+                fontName = selectedFontName,
                 onFinish = {
+                    navController.navigate("dashboard") {
+                        popUpTo("dashboard") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("print_settings") {
+            PrintSettingsScreen(
+                onPrint = { size, font ->
+                    paperSize = size
+                    selectedFontName = font
                     navController.navigate("dashboard") {
                         popUpTo("dashboard") { inclusive = true }
                     }

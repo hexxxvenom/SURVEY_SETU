@@ -20,13 +20,15 @@ fun SurveyPreviewScreen(
     questions: List<QuestionUiModel>,
     answers: Map<String, String>,
     printerName: String?,
+    paperSizeMm: Int = 58,
+    fontName: String = "Mangal",
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
     var isPrinting by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Final Confirmation") }) }
+        topBar = { TopAppBar(title = { Text("Mission Summary") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -68,19 +70,22 @@ fun SurveyPreviewScreen(
                         if (printerName != null) {
                             isPrinting = true
                             val result = PrintManager.printSurveyReceipt(
+                                context = context,
                                 printerName = printerName,
-                                surveyTitle = "Demographic Survey",
+                                surveyTitle = "Mission Record",
                                 respondentName = respondentName,
                                 respondentContact = respondentContact,
                                 questions = questions,
-                                answers = answers
+                                answers = answers,
+                                paperSizeMm = paperSizeMm,
+                                selectedFont = fontName
                             )
                             isPrinting = false
                             if (result.isFailure) {
                                 Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                             }
                         } else {
-                            Toast.makeText(context, "Please connect a printer from Dashboard", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Link a printer from the dashboard first", Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
@@ -94,7 +99,7 @@ fun SurveyPreviewScreen(
                     onClick = onFinish,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
-                    Text("Finish Mission")
+                    Text("Finish Shift")
                 }
             }
         }
