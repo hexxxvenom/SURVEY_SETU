@@ -9,10 +9,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.surveysetu.app.utils.PrintManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +31,7 @@ fun SurveyPreviewScreen(
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var isPrinting by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -83,21 +86,25 @@ fun SurveyPreviewScreen(
                     onClick = {
                         if (printerName != null) {
                             isPrinting = true
-                            val result = PrintManager.printSurveyReceipt(
-                                context = context,
-                                printerName = printerName,
-                                surveyTitle = "SURVEYSETU RECORD",
-                                respondentName = respondentName,
-                                respondentContact = respondentContact,
-                                questions = questions,
-                                answers = answers,
-                                paperSizeMm = paperSizeMm,
-                                selectedFont = fontName,
-                                fontSize = fontSize
-                            )
-                            isPrinting = false
-                            if (result.isFailure) {
-                                Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            scope.launch {
+                                // ASYNC PRINT: Prevents UI Glitch
+                                val result = PrintManager.printSurveyReceipt(
+                                    printerName = printerName,
+                                    surveyTitle = "SURVEYSETU RECORD",
+                                    respondentName = respondentName,
+                                    respondentContact = respondentContact,
+                                    questions = questions,
+                                    answers = answers,
+                                    paperSizeMm = paperSizeMm,
+                                    selectedFont = fontName,
+                                    fontSize = fontSize
+                                )
+                                isPrinting = false
+                                if (result.isFailure) {
+                                    Toast.makeText(context, "Print Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Receipt Sent Successfully!", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         } else {
                             Toast.makeText(context, "Please connect a printer from Dashboard", Toast.LENGTH_SHORT).show()
@@ -107,7 +114,8 @@ fun SurveyPreviewScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                     enabled = !isPrinting
                 ) {
-                    Text("Print Receipt")
+                    if (isPrinting) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    else Text("Print Receipt")
                 }
                 
                 Button(

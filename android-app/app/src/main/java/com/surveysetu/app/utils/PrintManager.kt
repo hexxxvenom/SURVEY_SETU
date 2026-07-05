@@ -11,16 +11,18 @@ import com.dantsu.escposprinter.EscPosPrinter
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 import com.dantsu.escposprinter.textparser.PrinterTextParserImg
 import com.surveysetu.app.ui.QuestionUiModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object PrintManager {
 
     /**
-     * WORLD-CLASS PRINTING ENGINE V2:
-     * Supports Hindi, English, and Bilingual modes with dynamic font scaling.
+     * THREAD-SAFE PRINTING ENGINE:
+     * Moves all heavy bitmap generation and Bluetooth data transfer to 
+     * a background thread to prevent app crashes and "glitches".
      */
     @SuppressLint("MissingPermission")
-    fun printSurveyReceipt(
-        context: Context,
+    suspend fun printSurveyReceipt(
         printerName: String,
         surveyTitle: String,
         respondentName: String,
@@ -30,15 +32,15 @@ object PrintManager {
         paperSizeMm: Int = 58,
         selectedFont: String = "Roboto",
         fontSize: Int = 24
-    ): Result<Unit> {
-        return try {
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
             val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
             val pairedDevices = bluetoothAdapter?.bondedDevices ?: emptySet()
             val device = pairedDevices.find { it.name == printerName || it.address == printerName }
-                ?: return Result.failure(Exception("Printer not found"))
+                ?: return@withContext Result.failure(Exception("Printer not found"))
 
             val connection = BluetoothPrintersConnections().getList()?.find { it.getDevice().address == device.address }
-                ?: return Result.failure(Exception("Connection failed"))
+                ?: return@withContext Result.failure(Exception("Connection failed"))
 
             val printer = EscPosPrinter(connection, 203, paperSizeMm.toFloat(), 32)
             
