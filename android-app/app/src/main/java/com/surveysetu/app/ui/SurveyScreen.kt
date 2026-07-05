@@ -8,11 +8,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.surveysetu.app.data.SurveyEntity
 
+data class QuestionUiModel(val id: String, val text: String, val isMandatory: Boolean, val options: List<OptionUiModel>)
+data class OptionUiModel(val id: String, val text: String)
+data class AnswerUiModel(val questionId: String, val selectedOptionId: String)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SurveyScreen(
     viewModel: SurveyViewModel = viewModel(factory = SurveyViewModelFactory()),
-    onFinish: (Map<String, String>, List<QuestionUiModel>) -> Unit // Pass questions too for preview
+    onFinish: (Map<String, String>, List<QuestionUiModel>) -> Unit
 ) {
     val surveyState by viewModel.surveyState.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
@@ -27,7 +31,6 @@ fun SurveyScreen(
             }
             is SurveyState.Error -> {
                 if (state.message == "ACCOUNT_LOCKED") {
-                   // This is handled in Dashboard but adding safety check here
                    Text("Session Expired: Device Locked", color = MaterialTheme.colorScheme.error)
                 } else {
                     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
@@ -61,7 +64,7 @@ private fun SurveyContent(
     isSubmitting: Boolean,
     onSubmit: (Map<String, String>) -> Unit
 ) {
-    var currentIndex by remember { mutableStateOf(0) }
+    var currentIndex by remember { mutableIntStateOf(0) }
     val answers = remember { mutableStateMapOf<String, String>() }
 
     val currentQuestion = questions[currentIndex]
@@ -128,7 +131,7 @@ private fun SurveyContent(
             ) {
                 Button(
                     onClick = { if (currentIndex > 0) currentIndex-- },
-                    enabled = currentIndex > 0,
+                    enabled = currentIndex > 0 && !isSubmitting,
                     modifier = Modifier.width(120.dp).height(48.dp)
                 ) {
                     Text("Previous")
@@ -142,16 +145,16 @@ private fun SurveyContent(
                             onSubmit(answers.toMap())
                         }
                     },
-                    enabled = (answers.containsKey(currentQuestion.id) || !currentQuestion.isMandatory),
+                    enabled = (answers.containsKey(currentQuestion.id) || !currentQuestion.isMandatory) && !isSubmitting,
                     modifier = Modifier.width(120.dp).height(48.dp)
                 ) {
-                    Text(if (currentIndex == questions.size - 1) "Finish" else "Next")
+                    if (isSubmitting && currentIndex == questions.size - 1) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Text(if (currentIndex == questions.size - 1) "Finish" else "Next")
+                    }
                 }
             }
         }
     }
 }
-
-data class QuestionUiModel(val id: String, val text: String, val isMandatory: Boolean, val options: List<OptionUiModel>)
-data class OptionUiModel(val id: String, val text: String)
-data class AnswerUiModel(val questionId: String, val selectedOptionId: String)
