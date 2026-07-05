@@ -8,6 +8,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import android.util.Log
 
 class SurveyRepository(
     private val apiService: ApiService,
@@ -48,6 +49,14 @@ class SurveyRepository(
             val response = apiService.getActiveSurveys()
             if (response.isSuccessful) {
                 val surveys = response.body() ?: return@withContext Result.failure(Exception("Empty body"))
+                
+                Log.d("SurveyRepository", "Received ${surveys.size} surveys from cloud")
+                
+                // Nuclear Sync: Clear old to ensure no ghost data
+                surveyDao.clearAllOptions()
+                surveyDao.clearAllQuestions()
+                surveyDao.clearAllSurveys()
+                
                 surveys.forEach { surveyDto ->
                     surveyDao.insertSurvey(
                         SurveyEntity(
@@ -85,6 +94,7 @@ class SurveyRepository(
                 Result.failure(Exception("API Error: ${response.code()}"))
             }
         } catch (e: Exception) {
+            Log.e("SurveyRepository", "Sync failed", e)
             Result.failure(e)
         }
     }

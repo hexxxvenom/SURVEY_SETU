@@ -8,6 +8,9 @@ interface SurveyDao {
     @Query("SELECT * FROM surveys WHERE isPublished = 1 LIMIT 1")
     suspend fun getActiveSurvey(): SurveyEntity?
 
+    @Query("SELECT * FROM surveys WHERE isPublished = 1")
+    suspend fun getAllActiveSurveys(): List<SurveyEntity>
+
     @Query("SELECT * FROM questions WHERE surveyId = :surveyId ORDER BY orderIndex ASC")
     suspend fun getQuestionsForSurvey(surveyId: String): List<QuestionEntity>
 
@@ -38,4 +41,13 @@ interface SurveyDao {
 
     @Query("UPDATE responses SET isSynced = 1 WHERE id = :responseId")
     suspend fun markResponseSynced(responseId: String)
+    
+    @Query("DELETE FROM surveys")
+    suspend fun clearAllSurveys()
+
+    @Query("DELETE FROM questions")
+    suspend fun clearAllQuestions()
+
+    @Query("DELETE FROM options")
+    suspend fun clearAllOptions()
 }

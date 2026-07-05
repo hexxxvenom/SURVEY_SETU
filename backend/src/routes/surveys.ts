@@ -18,8 +18,13 @@ router.get('/active', async (_req, res) => {
         }
       }
     });
+
+    // Debug log to check if surveys are found
+    console.log(`[APP-FETCH] Active surveys requested. Found: ${surveys.length}`);
+
     res.json(surveys);
   } catch (err: any) {
+    console.error("[APP-FETCH ERROR]", err);
     res.status(500).json({ error: err.message });
   }
 });

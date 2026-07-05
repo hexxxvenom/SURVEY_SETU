@@ -11,9 +11,14 @@ import android.util.Log
 
 sealed class SurveyState {
     object Loading : SurveyState()
-    data class Success(val survey: SurveyEntity, val questions: List<QuestionUiModel>) : SurveyState()
+    data class Success(val surveys: List<SurveyWithQuestions>) : SurveyState()
     data class Error(val message: String) : SurveyState()
 }
+
+data class SurveyWithQuestions(
+    val survey: SurveyEntity,
+    val questions: List<QuestionUiModel>
+)
 
 class SurveyViewModel(
     val repository: SurveyRepository,
@@ -27,10 +32,10 @@ class SurveyViewModel(
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     init {
-        loadLocalSurvey(triggerSyncIfEmpty = true)
+        loadLocalSurveys(triggerSyncIfEmpty = true)
     }
 
-    fun loadLocalSurvey(triggerSyncIfEmpty: Boolean = false) {
+    fun loadLocalSurveys(triggerSyncIfEmpty: Boolean = false) {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
             try {
@@ -41,39 +46,47 @@ class SurveyViewModel(
                     return@launch
                 }
 
-                val survey = surveyDao.getActiveSurvey()
-                if (survey != null) {
-                    val questions = surveyDao.getQuestionsForSurvey(survey.id)
-                    val uiQuestions = questions.map { q ->
-                        val options = surveyDao.getOptionsForQuestion(q.id)
-                        QuestionUiModel(
-                            id = q.id,
-                            text = q.questionText,
-                            isMandatory = q.isMandatory,
-                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
-                        )
+                val localSurveys = surveyDao.getAllActiveSurveys()
+                if (localSurveys.isNotEmpty()) {
+                    val surveysWithQuestions = localSurveys.map { survey ->
+                        val questions = surveyDao.getQuestionsForSurvey(survey.id)
+                        val uiQuestions = questions.map { q ->
+                            val options = surveyDao.getOptionsForQuestion(q.id)
+                            QuestionUiModel(
+                                id = q.id,
+                                text = q.questionText,
+                                isMandatory = q.isMandatory,
+                                options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                            )
+                        }
+                        SurveyWithQuestions(survey, uiQuestions)
                     }
-                    _surveyState.value = SurveyState.Success(survey, uiQuestions)
+                    _surveyState.value = SurveyState.Success(surveysWithQuestions)
+                    Log.d("SurveyViewModel", "Loaded ${surveysWithQuestions.size} surveys from local DB")
                 } else if (triggerSyncIfEmpty) {
                     syncSurveys()
                 } else {
                     _surveyState.value = SurveyState.Error("No active survey found. Click Sync.")
                 }
             } catch (e: Exception) {
+                Log.e("SurveyViewModel", "Load failed", e)
                 // Fallback to local if totally offline
-                val local = surveyDao.getActiveSurvey()
-                if (local != null) {
-                    val questions = surveyDao.getQuestionsForSurvey(local.id)
-                    val uiQuestions = questions.map { q ->
-                        val options = surveyDao.getOptionsForQuestion(q.id)
-                        QuestionUiModel(
-                            id = q.id,
-                            text = q.questionText,
-                            isMandatory = q.isMandatory,
-                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
-                        )
+                val localSurveys = surveyDao.getAllActiveSurveys()
+                if (localSurveys.isNotEmpty()) {
+                    val surveysWithQuestions = localSurveys.map { survey ->
+                        val questions = surveyDao.getQuestionsForSurvey(survey.id)
+                        val uiQuestions = questions.map { q ->
+                            val options = surveyDao.getOptionsForQuestion(q.id)
+                            QuestionUiModel(
+                                id = q.id,
+                                text = q.questionText,
+                                isMandatory = q.isMandatory,
+                                options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                            )
+                        }
+                        SurveyWithQuestions(survey, uiQuestions)
                     }
-                    _surveyState.value = SurveyState.Success(local, uiQuestions)
+                    _surveyState.value = SurveyState.Success(surveysWithQuestions)
                 } else {
                     _surveyState.value = SurveyState.Error("Cloud connection required for first shift.")
                 }
@@ -86,7 +99,7 @@ class SurveyViewModel(
         viewModelScope.launch {
             val result = repository.syncActiveSurveys()
             if (result.isSuccess) {
-                loadLocalSurvey(triggerSyncIfEmpty = false)
+                loadLocalSurveys(triggerSyncIfEmpty = false)
             } else {
                 _surveyState.value = SurveyState.Error("Sync failed. Check cloud connection.")
             }

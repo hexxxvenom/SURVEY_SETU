@@ -126,14 +126,14 @@ fun DashboardScreen(
                 }
                 is SurveyState.Success -> {
                     LazyColumn {
-                        items(listOf(state.survey)) { survey ->
+                        items(state.surveys) { data ->
                             Card(
-                                onClick = { onSurveySelected(survey) },
+                                onClick = { onSurveySelected(data.survey) },
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                             ) {
                                 ListItem(
-                                    headlineContent = { Text(survey.title, fontWeight = FontWeight.Bold) },
-                                    supportingContent = { Text("v${survey.version} • High-Resolution Dataset") },
+                                    headlineContent = { Text(data.survey.title, fontWeight = FontWeight.Bold) },
+                                    supportingContent = { Text("v${data.survey.version} • ${data.questions.size} Questions") },
                                     trailingContent = { Icon(Icons.Default.Refresh, contentDescription = null) }
                                 )
                             }
