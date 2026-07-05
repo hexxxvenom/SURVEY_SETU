@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store';
-import { Plus, Edit, Trash2, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const Surveys = () => {
@@ -13,10 +13,11 @@ export const Surveys = () => {
   const fetchSurveys = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/admin/surveys`, {
+      // Fetch using the new /admin/surveys/all endpoint
+      const res = await axios.get(`${API_URL}/surveys/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSurveys(res.data.data);
+      setSurveys(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch surveys");
     } finally {
@@ -37,12 +38,17 @@ export const Surveys = () => {
           <h1 className="text-3xl font-black text-navy uppercase tracking-tighter">Mission Templates</h1>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Survey Design & Lifecycle Management</p>
         </div>
-        <Link 
-          to="/surveys/new"
-          className="bg-navy text-white px-6 py-2 rounded-xl flex items-center gap-2 font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-900 transition-all"
-        >
-          <Plus size={18} /> Design New Survey
-        </Link>
+        <div className="flex gap-4">
+            <button onClick={fetchSurveys} className="p-2 bg-gray-50 text-gray-400 hover:text-navy rounded-xl transition-colors">
+                <RefreshCw size={20}/>
+            </button>
+            <Link
+            to="/surveys/new"
+            className="bg-navy text-white px-6 py-2 rounded-xl flex items-center gap-2 font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-900 transition-all"
+            >
+            <Plus size={18} /> Design New Survey
+            </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
