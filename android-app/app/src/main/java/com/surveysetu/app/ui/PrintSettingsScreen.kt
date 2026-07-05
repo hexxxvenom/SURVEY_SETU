@@ -15,28 +15,32 @@ import androidx.compose.ui.unit.sp
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PrintSettingsScreen(
-    surveyLanguage: String, // "en" or "hi"
     currentPaperSize: Int,
     currentFontName: String,
     currentFontSize: Int,
     onPrint: (Int, String, Int) -> Unit
 ) {
     var paperSize by remember { mutableIntStateOf(currentPaperSize) }
+    var languageMode by remember { mutableStateOf("English") } // RESTORED OPTION
     var fontSize by remember { mutableIntStateOf(currentFontSize) }
     
     val hindiFonts = listOf("Mangal", "KrutiDev", "Kokila", "Utsaah", "Aparajita")
     val englishFonts = listOf("Roboto", "Montserrat", "OpenSans", "Lato", "Playfair")
 
-    // STRICT LANGUAGE DETECTION: Ensuring "en" is never treated as "hi"
-    val isHindi = surveyLanguage.lowercase() == "hi" || surveyLanguage.lowercase() == "hindi"
-    val availableFonts = if (isHindi) hindiFonts else englishFonts
+    // Dynamic Font List based on restored Manual selection
+    val availableFonts = if (languageMode == "Hindi" || languageMode == "Bilingual") hindiFonts else englishFonts
     
     var selectedFont by remember { 
         mutableStateOf(if (availableFonts.contains(currentFontName)) currentFontName else availableFonts.first()) 
     }
 
+    // Force font update when manual language mode changes
+    LaunchedEffect(languageMode) {
+        selectedFont = availableFonts.first()
+    }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Master Print Control") }) }
+        topBar = { TopAppBar(title = { Text("Power Print Control") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -45,25 +49,25 @@ fun PrintSettingsScreen(
                 .padding(24.dp)
         ) {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                // STATUS PANEL
+                // 1. LANGUAGE SELECTION (RESTORED)
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            val langLabel = if (isHindi) "🇮🇳 HINDI MODE" else "🇬🇧 ENGLISH MODE"
-                            Text("Automatic Optimization Active", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(langLabel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
-                            Text("Metadata: [CODE: $surveyLanguage]", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
+                    Text("1. Manual Language Selection", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Row(modifier = Modifier.padding(vertical = 8.dp)) {
+                        listOf("English", "Hindi", "Bilingual").forEach { mode ->
+                            FilterChip(
+                                selected = languageMode == mode,
+                                onClick = { languageMode = mode },
+                                label = { Text(mode) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
                         }
                     }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 1. Paper Width (Expanded Labels)
+                // 2. Paper Width
                 item {
-                    Text("Select Roll Width", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Text("2. Select Roll Width", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp)) {
                         listOf(58 to "2\"", 80 to "3\"", 112 to "4\"").forEach { (valSize, label) ->
                             FilterChip(
@@ -77,9 +81,9 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 2. Premium Fonts
+                // 3. Premium Fonts
                 item {
-                    Text("Available Premium Fonts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Text("3. Premium Typefaces", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp), maxItemsInEachRow = 3) {
                         availableFonts.forEach { font ->
                             FilterChip(
@@ -93,14 +97,13 @@ fun PrintSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp)
                 }
 
-                // 3. Font Size (Expanded Scales: Now with Giant and Super Jumbo)
+                // 4. Font Size (MASSIVE SCALES)
                 item {
-                    Text("Global Text Scale", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                    Text("4. Absolute Text Scale", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
                     FlowRow(modifier = Modifier.padding(vertical = 8.dp)) {
-                        // Using a higher SP scale for UI, but backend now applies a 2.5x multiplier
-                        listOf(24, 32, 40, 56, 72).forEach { size ->
+                        listOf(24, 32, 48, 64, 80).forEach { size ->
                             val label = when(size) { 
-                                24 -> "Regular"; 32 -> "Large"; 40 -> "XL"; 56 -> "XXL"; else -> "GIANT" 
+                                24 -> "Regular"; 32 -> "Large"; 48 -> "XL"; 64 -> "XXL"; else -> "GIANT" 
                             }
                             FilterChip(
                                 selected = fontSize == size,
@@ -110,10 +113,9 @@ fun PrintSettingsScreen(
                             )
                         }
                     }
-                    Text(text = "Rendering at: ${fontSize * 2.5} High-Resolution Pixels", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
 
-                // 4. PREVIEW
+                // 5. POWER PREVIEW
                 item {
                     Spacer(modifier = Modifier.height(32.dp))
                     Card(
@@ -122,16 +124,14 @@ fun PrintSettingsScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("RECEIPT FIDELITY PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
+                            Text("FORCE-MAX PREVIEW", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
                             Spacer(modifier = Modifier.height(16.dp))
-                            val previewText = if (isHindi) "राष्ट्रीय सर्वेक्षण 2026" else "NATIONAL MISSION 2026"
-                            Text(previewText, fontSize = (fontSize/1.2).sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            val titleText = if (languageMode != "English") "मिशन रिकॉर्ड" else "MISSION RECORD"
+                            Text(titleText, fontSize = (fontSize/1.2).sp, fontWeight = FontWeight.Black, color = Color.Black)
                             Text("==========================", color = Color.Gray)
-                            Text("NAME: RAJESH KUMAR", fontSize = (fontSize/2).sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            val qPreview = if (isHindi) "1. आपका मुख्य व्यवसाय?" else "1. Primary Occupation?"
-                            val aPreview = if (isHindi) "उत्तर: कृषि" else "Ans: Farming"
-                            Text(qPreview, fontSize = (fontSize/2.5).sp, color = Color.Black)
-                            Text(aPreview, fontSize = (fontSize/2.5).sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            Text("NAME: RAJESH KUMAR", fontSize = (fontSize/1.8).sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            val qText = if (languageMode != "English") "1. आपका व्यवसाय?" else "1. Occupation?"
+                            Text(qText, fontSize = (fontSize/2).sp, color = Color.Black)
                         }
                     }
                 }
@@ -143,7 +143,7 @@ fun PrintSettingsScreen(
                 shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("SAVE & EXECUTE PRINT", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Text("SAVE & EXECUTE POWER PRINT", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
         }
     }

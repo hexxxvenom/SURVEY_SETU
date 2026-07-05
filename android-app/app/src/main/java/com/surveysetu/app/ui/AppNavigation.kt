@@ -18,7 +18,7 @@ fun AppNavigation() {
     var surveyQuestions by remember { mutableStateOf<List<QuestionUiModel>>(emptyList()) }
     var connectedPrinterName by remember { mutableStateOf<String?>(null) }
     
-    // Global Print State (Persistent across wizard visits)
+    // Global Print State
     var paperSize by remember { mutableIntStateOf(58) }
     var selectedFontName by remember { mutableStateOf("Roboto") }
     var fontSize by remember { mutableIntStateOf(24) }
@@ -97,9 +97,8 @@ fun AppNavigation() {
         }
 
         composable("print_wizard") {
-            // FIXED: Pass CURRENT values so choices are preserved and updated
+            // MANUAL LANGUAGE OPTION RESTORED
             PrintSettingsScreen(
-                surveyLanguage = selectedSurvey?.language ?: "en",
                 currentPaperSize = paperSize,
                 currentFontName = selectedFontName,
                 currentFontSize = fontSize,
