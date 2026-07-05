@@ -12,6 +12,7 @@ import android.util.Log
 sealed class SurveyState {
     object Loading : SurveyState()
     data class Success(val surveys: List<SurveyWithQuestions>) : SurveyState()
+    data class SingleSuccess(val survey: SurveyEntity, val questions: List<QuestionUiModel>) : SurveyState()
     data class Error(val message: String) : SurveyState()
 }
 
@@ -75,6 +76,38 @@ class SurveyViewModel(
         }
     }
 
+    fun loadSingleSurvey(surveyId: String) {
+        val current = _surveyState.value
+        if (current is SurveyState.SingleSuccess && current.survey.id == surveyId) {
+            return
+        }
+
+        _surveyState.value = SurveyState.Loading
+        
+        viewModelScope.launch {
+            try {
+                val survey = surveyDao.getAllActiveSurveys().find { it.id == surveyId }
+                if (survey != null) {
+                    val questions = surveyDao.getQuestionsForSurvey(survey.id)
+                    val uiQuestions = questions.map { q ->
+                        val options = surveyDao.getOptionsForQuestion(q.id)
+                        QuestionUiModel(
+                            id = q.id,
+                            text = q.questionText,
+                            isMandatory = q.isMandatory,
+                            options = options.map { o -> OptionUiModel(o.id, o.optionText) }
+                        )
+                    }
+                    _surveyState.value = SurveyState.SingleSuccess(survey, uiQuestions)
+                } else {
+                    _surveyState.value = SurveyState.Error("Mission details not found.")
+                }
+            } catch (e: Exception) {
+                _surveyState.value = SurveyState.Error("Failed to initiate mission.")
+            }
+        }
+    }
+
     fun syncSurveys() {
         _surveyState.value = SurveyState.Loading
         viewModelScope.launch {
@@ -87,7 +120,6 @@ class SurveyViewModel(
         }
     }
 
-    // UPDATED: Real-time Cloud Submission
     fun submitSurvey(
         survey: SurveyEntity, 
         answers: Map<String, String>, 
@@ -99,23 +131,31 @@ class SurveyViewModel(
         viewModelScope.launch {
             val answerList = answers.map { AnswerUiModel(it.key, it.value) }
             
-            // 1. Force upload to cloud immediately
+            // 1. Force upload to cloud immediately with Real-Time HW and User Context
+            val hwId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext()
+            
             val result = repository.uploadResponse(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext(),
-                lat = null, // GPS logic maintained in another module
+                deviceId = hwId,
+                lat = null, 
                 lng = null,
                 name = respondentName,
                 contact = respondentContact,
                 answers = answerList
             )
             
+            if (result.isSuccess) {
+                Log.i("SurveyViewModel", "Response successfully synced to Cloud")
+            } else {
+                Log.e("SurveyViewModel", "Cloud Sync Failed: ${result.exceptionOrNull()?.message}")
+            }
+            
             // 2. Local backup
             repository.saveResponseLocally(
                 surveyId = survey.id,
                 version = survey.version,
-                deviceId = DatabaseProvider.sessionManager.getDeviceIdAcrossContext(), 
+                deviceId = hwId, 
                 surveyorId = DatabaseProvider.sessionManager.getUserId() ?: "---",
                 lat = null,
                 lng = null,

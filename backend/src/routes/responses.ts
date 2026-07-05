@@ -6,24 +6,13 @@ import path from 'path';
 
 const router = Router();
 
-// SECURITY: Restrict uploads to images only, max 5MB
-const upload = multer({ 
+const upload = multer({
   dest: 'uploads/',
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
-    }
-  }
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 router.use(authenticate);
 
-// Submit survey response — with safe JSON parsing and validation
 router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res) => {
   const {
     survey_id,
@@ -32,71 +21,79 @@ router.post('/', upload.single('respondent_photo'), async (req: AuthRequest, res
     gps_lat,
     gps_lng,
     answers,
-    respondent_name,     // Added for new requirement
-    respondent_contact   // Added for new requirement
+    respondent_name,
+    respondent_contact
   } = req.body;
   const surveyor_id = req.user!.id;
 
-  // SECURITY: Validate required fields
+  console.log(`[RESPONSE] Incoming: Survey ${survey_id}, User: ${surveyor_id}, Device: ${device_id}`);
+
   if (!survey_id || !survey_version || !device_id) {
+    console.error("[RESPONSE ERROR] Missing Core Headers");
     return res.status(400).json({ error: 'survey_id, survey_version, and device_id are required' });
   }
 
-  // SECURITY: Safe JSON parse — don't crash on malformed input
+  // Find the internal DB ID for the hardware
+  const device = await prisma.device.findUnique({
+      where: { device_identifier: device_id }
+  });
+
+  if (!device) {
+      console.error(`[RESPONSE ERROR] Hardware ${device_id} not authorized in CMS`);
+      return res.status(404).json({ error: "Unauthorized hardware ID" });
+  }
+
   let parsedAnswers: any[];
   try {
     parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers;
   } catch (_parseErr) {
-    return res.status(400).json({ error: 'Invalid answers format. Must be valid JSON array.' });
+    console.error("[RESPONSE ERROR] malformed JSON answers");
+    return res.status(400).json({ error: 'Invalid answers format' });
   }
 
-  if (!Array.isArray(parsedAnswers) || parsedAnswers.length === 0) {
-    return res.status(400).json({ error: 'At least one answer is required' });
+  try {
+    const response = await prisma.response.create({
+        data: {
+          survey_id,
+          survey_version: parseInt(survey_version.toString()),
+          device_id: device.id, // Use internal UUID
+          surveyor_id,
+          respondent_name: respondent_name || "N/A",
+          respondent_contact: respondent_contact || "N/A",
+          gps_lat: gps_lat ? parseFloat(gps_lat.toString()) : null,
+          gps_lng: gps_lng ? parseFloat(gps_lng.toString()) : null,
+          respondent_photo_url: req.file ? `/uploads/${req.file.filename}` : null,
+          answers: {
+            create: parsedAnswers.map((a: any) => ({
+              question_id: a.question_id,
+              selected_option_id: a.selected_option_id
+            }))
+          }
+        }
+      });
+
+      console.log(`[RESPONSE SUCCESS] Saved: ${response.id}`);
+      res.status(201).json(response);
+  } catch (err: any) {
+      console.error("[RESPONSE DATABASE ERROR]", err);
+      res.status(500).json({ error: err.message });
   }
-
-  const respondent_photo_url = req.file ? `/uploads/${req.file.filename}` : null;
-
-  const response = await prisma.response.create({
-    data: {
-      survey_id,
-      survey_version: parseInt(survey_version),
-      device_id,
-      surveyor_id,
-      respondent_name,      // Added
-      respondent_contact,   // Added
-      gps_lat: gps_lat ? parseFloat(gps_lat) : null,
-      gps_lng: gps_lng ? parseFloat(gps_lng) : null,
-      respondent_photo_url,
-      answers: {
-        create: parsedAnswers.map((a: any) => ({
-          question_id: a.question_id,
-          selected_option_id: a.selected_option_id
-        }))
-      }
-    }
-  });
-
-  res.status(201).json(response);
 });
 
-// PERFORMANCE: Paginated history
 router.get('/history', async (req: AuthRequest, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
   const skip = (page - 1) * pageSize;
 
-  const [history, total] = await Promise.all([
-    prisma.response.findMany({
+  const history = await prisma.response.findMany({
       where: { surveyor_id: req.user!.id },
       include: { survey: { select: { title: true } } },
       take: pageSize,
       skip,
       orderBy: { submitted_at: 'desc' }
-    }),
-    prisma.response.count({ where: { surveyor_id: req.user!.id } })
-  ]);
+  });
 
-  res.json({ data: history, meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
+  res.json({ data: history });
 });
 
 export default router;
