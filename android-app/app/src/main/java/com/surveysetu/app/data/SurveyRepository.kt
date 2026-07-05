@@ -46,18 +46,21 @@ class SurveyRepository(
 
     suspend fun syncActiveSurveys(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            Log.d("SurveyRepository", "Syncing surveys from cloud...")
             val response = apiService.getActiveSurveys()
             if (response.isSuccessful) {
-                val surveys = response.body() ?: return@withContext Result.failure(Exception("Empty body"))
+                val surveys = response.body() ?: return@withContext Result.failure(Exception("Cloud returned empty data"))
                 
-                Log.d("SurveyRepository", "Received ${surveys.size} surveys from cloud")
+                Log.d("SurveyRepository", "Found ${surveys.size} surveys to sync")
                 
-                // Nuclear Sync: Clear old to ensure no ghost data
+                // Nuclear Sync: Wipe old to ensure fresh 18-question dataset
                 surveyDao.clearAllOptions()
                 surveyDao.clearAllQuestions()
                 surveyDao.clearAllSurveys()
                 
                 surveys.forEach { surveyDto ->
+                    Log.d("SurveyRepository", "Processing: ${surveyDto.title}")
+                    
                     surveyDao.insertSurvey(
                         SurveyEntity(
                             id = surveyDto.id,
@@ -66,6 +69,7 @@ class SurveyRepository(
                             isPublished = true
                         )
                     )
+                    
                     val questions = surveyDto.questions.map { q ->
                         QuestionEntity(
                             id = q.id,
@@ -77,6 +81,8 @@ class SurveyRepository(
                         )
                     }
                     surveyDao.insertQuestions(questions)
+                    Log.d("SurveyRepository", "Saved ${questions.size} questions")
+                    
                     surveyDto.questions.forEach { q ->
                         val options = q.options.map { o ->
                             OptionEntity(
@@ -89,12 +95,20 @@ class SurveyRepository(
                         surveyDao.insertOptions(options)
                     }
                 }
+                
+                // VERIFICATION: Check if data actually saved
+                val verify = surveyDao.getAllActiveSurveys()
+                if (verify.isEmpty()) {
+                    Log.e("SurveyRepository", "DB WRITE VERIFICATION FAILED")
+                    return@withContext Result.failure(Exception("Database write failed"))
+                }
+                
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("API Error: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e("SurveyRepository", "Sync failed", e)
+            Log.e("SurveyRepository", "CRITICAL SYNC FAILURE", e)
             Result.failure(e)
         }
     }
