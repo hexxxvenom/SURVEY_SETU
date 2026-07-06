@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
+// Base authorization: Only Super Admin and Admin can enter this router
 router.use(authenticate, authorize(['SUPER_ADMIN', 'ADMIN']));
 
 // --- User Management ---
@@ -23,8 +24,10 @@ router.get('/users', async (req: AuthRequest, res) => {
 
 router.post('/users', async (req: AuthRequest, res) => {
   const { name, username, password, role, linked_device_id } = req.body;
-  if (!name || !username || !password || !role) {
-    return res.status(400).json({ error: 'All core fields are required' });
+
+  // ROLE SECURITY: Admins can ONLY create SURVEYORS
+  if (req.user!.role === 'ADMIN' && role !== 'SURVEYOR') {
+      return res.status(403).json({ error: "Admins can only register new Surveyors" });
   }
 
   try {
@@ -37,11 +40,11 @@ router.post('/users', async (req: AuthRequest, res) => {
         username,
         password_hash: await bcrypt.hash(password, 10),
         role,
-        linked_device_id: linked_device_id || null
+        linked_device_id: (role === 'SURVEYOR') ? (linked_device_id || null) : null
       }
     });
 
-    if (linked_device_id) {
+    if (role === 'SURVEYOR' && linked_device_id) {
         await prisma.device.update({
             where: { device_identifier: linked_device_id },
             data: { assigned_user_id: user.id }
@@ -57,11 +60,23 @@ router.post('/users', async (req: AuthRequest, res) => {
 router.put('/users/:id', async (req: AuthRequest, res) => {
     const { name, role, linked_device_id, password } = req.body;
     const userId = req.params.id as string;
+
     try {
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+        // HIERARCHY PROTECTION:
+        // 1. No one touches SuperAdmin
+        // 2. Admins cannot touch other Admins
+        if (targetUser.role === 'SUPER_ADMIN' || (req.user!.role === 'ADMIN' && targetUser.role === 'ADMIN')) {
+            return res.status(403).json({ error: "Insufficient permissions to modify this user" });
+        }
+
         const updateData: any = { name, role, linked_device_id: linked_device_id || null };
         if (password) {
             updateData.password_hash = await bcrypt.hash(password, 10);
         }
+
         const user = await prisma.user.update({
             where: { id: userId },
             data: updateData
@@ -75,8 +90,13 @@ router.put('/users/:id', async (req: AuthRequest, res) => {
 router.delete('/users/:id', async (req: AuthRequest, res) => {
     const userId = req.params.id as string;
     try {
-        const userToDelete = await prisma.user.findUnique({ where: { id: userId } });
-        if (userToDelete?.username === 'superadmin') return res.status(403).json({ error: "Cannot delete Root Admin" });
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+        // HIERARCHY PROTECTION
+        if (targetUser.role === 'SUPER_ADMIN' || (req.user!.role === 'ADMIN' && targetUser.role === 'ADMIN')) {
+            return res.status(403).json({ error: "Cannot delete higher or equal rank personnel" });
+        }
 
         await prisma.$transaction([
             prisma.answer.deleteMany({ where: { response: { surveyor_id: userId } } }),
@@ -88,8 +108,7 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
 
         res.json({ success: true });
     } catch (error: any) {
-        console.error("Cascade Delete Failed:", error);
-        res.status(500).json({ error: "Cannot delete user. They have active dependencies." });
+        res.status(500).json({ error: "Deletion failed due to active field data" });
     }
 });
 
@@ -97,6 +116,9 @@ router.patch('/users/:id/status', async (req: AuthRequest, res) => {
   const userId = req.params.id as string;
   const { status } = req.body;
   try {
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (targetUser?.role === 'SUPER_ADMIN') return res.status(403).json({ error: "Cannot lock Root Admin" });
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: { status }
